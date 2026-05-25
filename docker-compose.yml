@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: vps-dashboard-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vpsdashboard}
+      POSTGRES_USER: ${POSTGRES_USER:-vpsadmin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vpsadmin} -d ${POSTGRES_DB:-vpsdashboard}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: vps-dashboard
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${DASHBOARD_PORT:-8080}:8080"
+    volumes:
+      # Mount SSH keys so the dashboard can use them to connect to VPS
+      - ${HOME}/.ssh:/root/.ssh:ro
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-vpsadmin}:${POSTGRES_PASSWORD:-change-me}@db:5432/${POSTGRES_DB:-vpsdashboard}
+      - SECRET_KEY=${SECRET_KEY:-change-this-to-a-random-secret}
+      - DASHBOARD_USER=${DASHBOARD_USER:-admin}
+      - DASHBOARD_PASS=${DASHBOARD_PASS:-change-me}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/auth/check')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  pg-data:
+    driver: local

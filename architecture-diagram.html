@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VPS Dashboard Architecture Diagram</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: #020617;
+      min-height: 100vh;
+      padding: 2rem;
+      color: white;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header { margin-bottom: 2rem; }
+    .header-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+    .pulse-dot {
+      width: 12px; height: 12px;
+      background: #22d3ee; border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; }
+    .subtitle { color: #94a3b8; font-size: 0.875rem; margin-left: 1.75rem; }
+    .diagram-container {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 1rem; border: 1px solid #1e293b;
+      padding: 1.5rem; overflow-x: auto;
+    }
+    svg { width: 100%; min-width: 950px; display: block; }
+    .cards {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem; margin-top: 2rem;
+    }
+    .card {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 0.75rem; border: 1px solid #1e293b; padding: 1.25rem;
+    }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card-dot.cyan { background: #22d3ee; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.amber { background: #fbbf24; }
+    .card-dot.rose { background: #fb7185; }
+    .card-dot.orange { background: #fb923c; }
+    .card h3 { font-size: 0.875rem; font-weight: 600; }
+    .card ul { list-style: none; color: #94a3b8; font-size: 0.75rem; }
+    .card li { margin-bottom: 0.375rem; }
+    .footer { text-align: center; margin-top: 1.5rem; color: #475569; font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>VPS Dashboard Architecture</h1>
+      </div>
+      <p class="subtitle">Multi-Server Management Platform — Docker Compose Deployment</p>
+    </div>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1050 780">
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+          </marker>
+          <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee"/>
+          </marker>
+          <marker id="arrow-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/>
+          </marker>
+          <marker id="arrow-amber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24"/>
+          </marker>
+          <marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb923c"/>
+          </marker>
+          <marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185"/>
+          </marker>
+          <marker id="arrow-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa"/>
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <!-- Background Grid -->
+        <rect width="100%" height="100%" fill="url(#grid)"/>
+
+        <!-- ======== ARROWS (drawn first, behind components) ======== -->
+
+        <!-- User → Dashboard Container -->
+        <line x1="100" y1="170" x2="195" y2="170" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+        <text x="148" y="162" fill="#64748b" font-size="8" text-anchor="middle">HTTP/WS</text>
+
+        <!-- Dashboard Container → REST API -->
+        <line x1="370" y1="155" x2="448" y2="155" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+
+        <!-- Dashboard Container → WebSocket Terminal -->
+        <line x1="370" y1="185" x2="448" y2="185" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+
+        <!-- REST API → SSH Pool -->
+        <line x1="560" y1="155" x2="638" y2="155" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+
+        <!-- WebSocket → SSH Channel -->
+        <line x1="560" y1="185" x2="638" y2="185" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+
+        <!-- SSH Pool → VPS 1 -->
+        <path d="M 750 155 L 790 155 Q 810 155 810 175 L 810 310" fill="none" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+        <text x="822" y="235" fill="#fbbf24" font-size="8">SSH :22</text>
+
+        <!-- SSH Pool → VPS 2 -->
+        <line x1="700" y1="205" x2="700" y2="308" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+        <text x="712" y="260" fill="#fbbf24" font-size="8">SSH :22</text>
+
+        <!-- SSH Pool → VPS 3 -->
+        <path d="M 660 205 L 590 205 Q 570 205 570 225 L 570 308" fill="none" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+        <text x="555" y="260" fill="#fbbf24" font-size="8">SSH :22</text>
+
+        <!-- VPS 1 → Docker API -->
+        <line x1="810" y1="370" x2="810" y2="418" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+
+        <!-- VPS 2 → Docker API -->
+        <line x1="700" y1="370" x2="700" y2="418" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+
+        <!-- VPS 3 → Docker API -->
+        <line x1="570" y1="370" x2="570" y2="418" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+
+        <!-- Container → Logs -->
+        <line x1="730" y1="510" x2="730" y2="540" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+        <line x1="650" y1="510" x2="650" y2="540" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+
+        <!-- Auth flow (dashed) -->
+        <path d="M 260 120 L 260 62 Q 260 42 280 42 L 448 42" fill="none" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="5,5"/>
+        <text x="350" y="36" fill="#fb7185" font-size="8">Session Cookie Auth</text>
+
+        <!-- Data persist arrow -->
+        <line x1="300" y1="205" x2="300" y2="275" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+        <text x="310" y="245" fill="#a78bfa" font-size="8">JSON</text>
+
+        <!-- SSH Keys mount arrow -->
+        <path d="M 175 330 L 175 350 Q 175 370 195 370 L 195 380 Q 195 400 215 400 L 248 400" fill="none" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,4"/>
+        <text x="140" y="370" fill="#94a3b8" font-size="7">:ro mount</text>
+
+
+        <!-- ======== COMPONENTS ======== -->
+
+        <!-- User / Browser -->
+        <rect x="15" y="130" width="100" height="80" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="65" y="160" fill="white" font-size="11" font-weight="600" text-anchor="middle">👤 User</text>
+        <text x="65" y="176" fill="#94a3b8" font-size="9" text-anchor="middle">Browser</text>
+        <text x="65" y="192" fill="#94a3b8" font-size="8" text-anchor="middle">SPA + xterm.js</text>
+
+        <!-- Docker Host Boundary -->
+        <rect x="165" y="95" width="620" height="225" rx="12" fill="rgba(120, 53, 15, 0.05)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="178" y="113" fill="#fbbf24" font-size="10" font-weight="600">🐳 Docker Host (docker-compose.yml)</text>
+
+        <!-- Dashboard Container -->
+        <rect x="195" y="125" width="180" height="80" rx="8" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="285" y="150" fill="white" font-size="12" font-weight="600" text-anchor="middle">⚡ Dashboard</text>
+        <text x="285" y="167" fill="#94a3b8" font-size="9" text-anchor="middle">FastAPI + Uvicorn</text>
+        <text x="285" y="183" fill="#94a3b8" font-size="9" text-anchor="middle">Python 3.12 · :8080</text>
+        <text x="285" y="197" fill="#22d3ee" font-size="8" text-anchor="middle">Single Container</text>
+
+        <!-- Auth Module -->
+        <rect x="450" y="25" width="160" height="55" rx="6" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="530" y="48" fill="white" font-size="11" font-weight="600" text-anchor="middle">🔒 Auth Module</text>
+        <text x="530" y="64" fill="#94a3b8" font-size="9" text-anchor="middle">Cookie Session · Login</text>
+
+        <!-- REST API -->
+        <rect x="450" y="130" width="110" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="505" y="150" fill="white" font-size="11" font-weight="600" text-anchor="middle">REST API</text>
+        <text x="505" y="166" fill="#94a3b8" font-size="9" text-anchor="middle">CRUD + Stats</text>
+
+        <!-- WebSocket Terminal -->
+        <rect x="450" y="160" width="110" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="505" y="180" fill="white" font-size="11" font-weight="600" text-anchor="middle">WebSocket</text>
+        <text x="505" y="196" fill="#94a3b8" font-size="9" text-anchor="middle">Terminal I/O</text>
+
+        <!-- SSH Connection Pool -->
+        <rect x="640" y="130" width="120" height="80" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="700" y="155" fill="white" font-size="11" font-weight="600" text-anchor="middle">SSH Pool</text>
+        <text x="700" y="171" fill="#94a3b8" font-size="9" text-anchor="middle">Paramiko</text>
+        <text x="700" y="187" fill="#34d399" font-size="8" text-anchor="middle">Connection Reuse</text>
+        <text x="700" y="201" fill="#34d399" font-size="8" text-anchor="middle">PTY Channels</text>
+
+        <!-- Persistent Data -->
+        <rect x="210" y="275" width="140" height="40" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="280" y="295" fill="white" font-size="11" font-weight="600" text-anchor="middle">📂 Persistent Data</text>
+        <text x="280" y="308" fill="#94a3b8" font-size="8" text-anchor="middle">vps-data volume · JSON</text>
+
+        <!-- SSH Keys -->
+        <rect x="210" y="330" width="120" height="35" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="270" y="347" fill="white" font-size="10" font-weight="600" text-anchor="middle">🔑 SSH Keys</text>
+        <text x="270" y="359" fill="#94a3b8" font-size="8" text-anchor="middle">~/.ssh (read-only)</text>
+
+        <!-- ======== REMOTE VPS BOUNDARY ======== -->
+        <rect x="480" y="280" width="430" height="340" rx="12" fill="rgba(251, 191, 36, 0.03)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="493" y="298" fill="#fbbf24" font-size="10" font-weight="600">🌍 Remote VPS Servers</text>
+
+        <!-- VPS 1 -->
+        <rect x="510" y="310" width="120" height="60" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="570" y="332" fill="white" font-size="11" font-weight="600" text-anchor="middle">🖥️ VPS 1</text>
+        <text x="570" y="348" fill="#94a3b8" font-size="9" text-anchor="middle">Production</text>
+        <text x="570" y="362" fill="#94a3b8" font-size="8" text-anchor="middle">192.168.1.10</text>
+
+        <!-- VPS 2 -->
+        <rect x="640" y="310" width="120" height="60" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="700" y="332" fill="white" font-size="11" font-weight="600" text-anchor="middle">🖥️ VPS 2</text>
+        <text x="700" y="348" fill="#94a3b8" font-size="9" text-anchor="middle">Staging</text>
+        <text x="700" y="362" fill="#94a3b8" font-size="8" text-anchor="middle">10.0.0.50</text>
+
+        <!-- VPS 3 -->
+        <rect x="770" y="310" width="120" height="60" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="830" y="332" fill="white" font-size="11" font-weight="600" text-anchor="middle">🖥️ VPS N</text>
+        <text x="830" y="348" fill="#94a3b8" font-size="9" text-anchor="middle">Database</text>
+        <text x="830" y="362" fill="#94a3b8" font-size="8" text-anchor="middle">172.16.0.100</text>
+
+        <!-- Docker API on VPS 1 -->
+        <rect x="510" y="420" width="120" height="45" rx="6" fill="rgba(251, 146, 60, 0.3)" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="570" y="440" fill="white" font-size="10" font-weight="600" text-anchor="middle">🐳 Docker</text>
+        <text x="570" y="454" fill="#94a3b8" font-size="8" text-anchor="middle">ps · stats · logs</text>
+
+        <!-- Docker API on VPS 2 -->
+        <rect x="640" y="420" width="120" height="45" rx="6" fill="rgba(251, 146, 60, 0.3)" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="700" y="440" fill="white" font-size="10" font-weight="600" text-anchor="middle">🐳 Docker</text>
+        <text x="700" y="454" fill="#94a3b8" font-size="8" text-anchor="middle">ps · stats · logs</text>
+
+        <!-- Docker API on VPS 3 -->
+        <rect x="770" y="420" width="120" height="45" rx="6" fill="rgba(251, 146, 60, 0.3)" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="830" y="440" fill="white" font-size="10" font-weight="600" text-anchor="middle">🐳 Docker</text>
+        <text x="830" y="454" fill="#94a3b8" font-size="8" text-anchor="middle">ps · stats · logs</text>
+
+        <!-- Containers on VPS 1 -->
+        <rect x="510" y="480" width="55" height="30" rx="4" fill="rgba(251, 146, 60, 0.15)" stroke="#fb923c" stroke-width="1"/>
+        <text x="537" y="498" fill="#fb923c" font-size="8" font-weight="600" text-anchor="middle">nginx</text>
+
+        <rect x="572" y="480" width="55" height="30" rx="4" fill="rgba(251, 146, 60, 0.15)" stroke="#fb923c" stroke-width="1"/>
+        <text x="599" y="498" fill="#fb923c" font-size="8" font-weight="600" text-anchor="middle">redis</text>
+
+        <!-- Containers on VPS 2 -->
+        <rect x="640" y="480" width="55" height="30" rx="4" fill="rgba(251, 146, 60, 0.15)" stroke="#fb923c" stroke-width="1"/>
+        <text x="667" y="498" fill="#fb923c" font-size="8" font-weight="600" text-anchor="middle">app</text>
+
+        <rect x="702" y="480" width="55" height="30" rx="4" fill="rgba(251, 146, 60, 0.15)" stroke="#fb923c" stroke-width="1"/>
+        <text x="729" y="498" fill="#fb923c" font-size="8" font-weight="600" text-anchor="middle">worker</text>
+
+        <!-- Containers on VPS 3 -->
+        <rect x="770" y="480" width="55" height="30" rx="4" fill="rgba(251, 146, 60, 0.15)" stroke="#fb923c" stroke-width="1"/>
+        <text x="797" y="498" fill="#fb923c" font-size="8" font-weight="600" text-anchor="middle">postgres</text>
+
+        <rect x="832" y="480" width="55" height="30" rx="4" fill="rgba(251, 146, 60, 0.15)" stroke="#fb923c" stroke-width="1"/>
+        <text x="859" y="498" fill="#fb923c" font-size="8" font-weight="600" text-anchor="middle">backup</text>
+
+        <!-- System Resources -->
+        <rect x="510" y="540" width="120" height="30" rx="4" fill="rgba(76, 29, 149, 0.3)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="570" y="558" fill="white" font-size="8" font-weight="600" text-anchor="middle">CPU · RAM · Disk · Load</text>
+
+        <rect x="640" y="540" width="120" height="30" rx="4" fill="rgba(76, 29, 149, 0.3)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="700" y="558" fill="white" font-size="8" font-weight="600" text-anchor="middle">CPU · RAM · Disk · Load</text>
+
+        <rect x="770" y="540" width="120" height="30" rx="4" fill="rgba(76, 29, 149, 0.3)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="830" y="558" fill="white" font-size="8" font-weight="600" text-anchor="middle">CPU · RAM · Disk · Load</text>
+
+        <!-- System Logs -->
+        <rect x="510" y="580" width="120" height="30" rx="4" fill="rgba(136, 19, 55, 0.3)" stroke="#fb7185" stroke-width="1"/>
+        <text x="570" y="598" fill="white" font-size="8" font-weight="600" text-anchor="middle">syslog · auth · kernel</text>
+
+        <rect x="640" y="580" width="120" height="30" rx="4" fill="rgba(136, 19, 55, 0.3)" stroke="#fb7185" stroke-width="1"/>
+        <text x="700" y="598" fill="white" font-size="8" font-weight="600" text-anchor="middle">syslog · auth · kernel</text>
+
+        <rect x="770" y="580" width="120" height="30" rx="4" fill="rgba(136, 19, 55, 0.3)" stroke="#fb7185" stroke-width="1"/>
+        <text x="830" y="598" fill="white" font-size="8" font-weight="600" text-anchor="middle">syslog · auth · kernel</text>
+
+        <!-- ======== LEGEND ======== -->
+        <text x="25" y="440" fill="white" font-size="10" font-weight="600">Legend</text>
+
+        <rect x="25" y="452" width="16" height="10" rx="2" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="47" y="460" fill="#94a3b8" font-size="8">Frontend / SPA</text>
+
+        <rect x="25" y="468" width="16" height="10" rx="2" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="47" y="476" fill="#94a3b8" font-size="8">Backend / API</text>
+
+        <rect x="25" y="484" width="16" height="10" rx="2" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="47" y="492" fill="#94a3b8" font-size="8">Remote VPS</text>
+
+        <rect x="25" y="500" width="16" height="10" rx="2" fill="rgba(251, 146, 60, 0.3)" stroke="#fb923c" stroke-width="1"/>
+        <text x="47" y="508" fill="#94a3b8" font-size="8">Docker Containers</text>
+
+        <rect x="25" y="516" width="16" height="10" rx="2" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="47" y="524" fill="#94a3b8" font-size="8">Resources / Data</text>
+
+        <rect x="25" y="532" width="16" height="10" rx="2" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1"/>
+        <text x="47" y="540" fill="#94a3b8" font-size="8">Security / Auth</text>
+
+        <line x1="25" y1="556" x2="41" y2="556" stroke="#fb7185" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="47" y="559" fill="#94a3b8" font-size="8">Auth Flow</text>
+
+        <line x1="25" y1="572" x2="41" y2="572" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="47" y="575" fill="#94a3b8" font-size="8">Volume Mount</text>
+
+        <!-- Data Flow Labels -->
+        <text x="25" y="610" fill="white" font-size="10" font-weight="600">API Endpoints</text>
+        <text x="25" y="626" fill="#34d399" font-size="8">GET  /api/vps</text>
+        <text x="25" y="638" fill="#34d399" font-size="8">GET  /api/vps/:id/resources</text>
+        <text x="25" y="650" fill="#34d399" font-size="8">GET  /api/vps/:id/containers</text>
+        <text x="25" y="662" fill="#34d399" font-size="8">GET  /api/vps/:id/logs</text>
+        <text x="25" y="674" fill="#34d399" font-size="8">POST /api/vps/:id/exec</text>
+        <text x="25" y="686" fill="#34d399" font-size="8">WS   /ws/terminal/:id</text>
+
+      </svg>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot cyan"></div>
+          <h3>Frontend Layer</h3>
+        </div>
+        <ul>
+          <li>• Single Page App (Vanilla JS)</li>
+          <li>• xterm.js for SSH terminal</li>
+          <li>• Dark theme responsive UI</li>
+          <li>• WebSocket for real-time I/O</li>
+          <li>• No build step — served as static files</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot emerald"></div>
+          <h3>Backend Layer</h3>
+        </div>
+        <ul>
+          <li>• FastAPI async web framework</li>
+          <li>• Paramiko SSH connection pooling</li>
+          <li>• WebSocket terminal via PTY channels</li>
+          <li>• Cookie-based session authentication</li>
+          <li>• REST API for CRUD + monitoring</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot amber"></div>
+          <h3>Deployment</h3>
+        </div>
+        <ul>
+          <li>• Single Docker container</li>
+          <li>• Docker Compose for one-command deploy</li>
+          <li>• Persistent volume for VPS configs</li>
+          <li>• SSH keys mounted read-only from host</li>
+          <li>• ~80MB image (Python 3.12 slim)</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="footer">
+      VPS Dashboard v1.0 • FastAPI + Paramiko + xterm.js • Docker Compose
+    </p>
+  </div>
+</body>
+</html>

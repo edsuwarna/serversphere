@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudCore — VPS Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/external/xterm.css">
+    <script src="/js/external/xterm.min.js"></script>
+    <script src="/js/external/xterm-addon-fit.min.js"></script>
+    <script src="/js/external/xterm-addon-web-links.min.js"></script>
+</head>
+<body>
+    <!-- ═══ Login Screen ═══ -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-card">
+            <div class="login-logo">
+                <span class="material-icons login-icon">cloud_queue</span>
+                <h1>CloudCore</h1>
+                <p>Multi-Server Management</p>
+            </div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="loginUser">Username</label>
+                    <input type="text" id="loginUser" value="admin" required placeholder="Enter username">
+                </div>
+                <div class="form-group">
+                    <label for="loginPass">Password</label>
+                    <input type="password" id="loginPass" required placeholder="Enter password">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+                <div id="loginError" class="error-msg hidden"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ═══ Main Application ═══ -->
+    <div id="app" class="hidden">
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <span class="material-icons">cloud_done</span>
+                <span class="brand-text">CloudCore</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')">
+                    <span class="material-icons nav-icon">dashboard</span>
+                    <span class="nav-label">Overview</span>
+                </a>
+                <a href="#" class="nav-item" data-page="vps-list" onclick="showPage('vps-list')">
+                    <span class="material-icons nav-icon">dns</span>
+                    <span class="nav-label">Instances</span>
+                </a>
+                <a href="#" id="navUsers" class="nav-item" data-page="users" onclick="showPage('users')" style="display:none">
+                    <span class="material-icons nav-icon">people</span>
+                    <span class="nav-label">Users</span>
+                </a>
+                <a href="#" id="navAudit" class="nav-item" data-page="audit" onclick="showPage('audit')" style="display:none">
+                    <span class="material-icons nav-icon">receipt_long</span>
+                    <span class="nav-label">Audit Logs</span>
+                </a>
+                <a href="#" id="navPermissions" class="nav-item" data-page="permissions" onclick="showPage('permissions')" style="display:none">
+                    <span class="material-icons nav-icon">admin_panel_settings</span>
+                    <span class="nav-label">Permissions</span>
+                </a>
+                <a href="#" id="navSSHKeys" class="nav-item" data-page="ssh-keys" onclick="showPage('ssh-keys')" style="display:none">
+                    <span class="material-icons nav-icon">vpn_key</span>
+                    <span class="nav-label">SSH Keys</span>
+                </a>
+                <a href="#" id="navGroups" class="nav-item" data-page="groups" onclick="showPage('groups')" style="display:none">
+                    <span class="material-icons nav-icon">folder</span>
+                    <span class="nav-label">Groups</span>
+                </a>
+                <a href="#" id="navGitHub" class="nav-item" data-page="github" onclick="showPage('github')" style="display:none">
+                    <span class="material-icons nav-icon">rocket_launch</span>
+                    <span class="nav-label">GitHub Actions</span>
+                </a>
+
+            </nav>
+
+            <div class="sidebar-spacer"></div>
+
+            <div class="sidebar-bottom">
+                <a href="#" id="navAddVPS" class="nav-item nav-add" onclick="showAddVPSModal()">
+                    <span class="material-icons nav-icon">add_circle</span>
+                    <span class="nav-label">Add Instance</span>
+                </a>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="version">CloudCore v2.0</div>
+            </div>
+        </aside>
+
+        <!-- Main Panel -->
+        <div class="main-panel">
+            <!-- Top Bar -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <h2 class="topbar-title" id="pageTitle">Overview</h2>
+                </div>
+                <div class="topbar-center">
+                    <div class="search-bar">
+                        <span class="material-icons">search</span>
+                        <input type="text" placeholder="Search instances..." id="globalSearch">
+                    </div>
+                </div>
+                <div class="topbar-right">
+                    <div class="user-menu">
+                        <span class="material-icons user-avatar">account_circle</span>
+                        <span id="userDisplay" class="user-name"></span>
+                    </div>
+                    <button class="btn btn-ghost btn-sm" onclick="logout()">
+                        <span class="material-icons" style="font-size:18px">logout</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <main class="content">
+
+                <!-- ═══ Dashboard Page ═══ -->
+                <div id="page-dashboard" class="page active">
+                    <div class="page-header">
+                        <h2>Dashboard</h2>
+                        <button class="btn btn-primary" onclick="refreshDashboard()">
+                            <span class="material-icons" style="font-size:16px">refresh</span> Refresh
+                        </button>
+                    </div>
+
+                    <div class="stats-row">
+                        <div class="stat-card" style="border-left: 3px solid var(--primary)">
+                            <div class="stat-value" id="totalVPS">-</div>
+                            <div class="stat-label">Total Instances</div>
+                        </div>
+                        <div class="stat-card" style="border-left: 3px solid var(--success)">
+                            <div class="stat-value" id="onlineVPS" style="color:var(--success)">-</div>
+                            <div class="stat-label">Online</div>
+                        </div>
+                        <div class="stat-card" style="border-left: 3px solid var(--danger)">
+                            <div class="stat-value" id="offlineVPS" style="color:var(--danger)">-</div>
+                            <div class="stat-label">Offline</div>
+                        </div>
+                        <div class="stat-card" style="border-left: 3px solid var(--warning)">
+                            <div class="stat-value" id="totalContainers" style="color:var(--warning)">-</div>
+                            <div class="stat-label">Containers</div>
+                        </div>
+                    </div>
+
+                    <div id="dashboardGrid" class="dashboard-grid">
+                        <div class="empty-state">
+                            <span class="material-icons empty-icon">dns</span>
+                            <p>No VPS added yet. <a href="#" onclick="showAddVPSModal()">Add your first VPS</a></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ VPS List Page ═══ -->
+                <div id="page-vps-list" class="page">
+                    <div class="page-header">
+                        <h2>Instances</h2>
+                        <button id="addVPSBtn" class="btn btn-primary" onclick="showAddVPSModal()">
+                            <span class="material-icons" style="font-size:18px">add</span> Add Instance
+                        </button>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Status</th>
+                                    <th>Name</th>
+                                    <th>Host</th>
+                                    <th>User</th>
+                                    <th>Group</th>
+                                    <th>Tags</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vpsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ═══ Users Page (Admin Only) ═══ -->
+                <div id="page-users" class="page">
+                    <div class="page-header">
+                        <h2>User Management</h2>
+                        <div style="display:flex;gap:8px;">
+                            <button class="btn btn-primary" onclick="showInviteModal()">
+                                <span class="material-icons" style="font-size:18px">mail</span> Invite Member
+                            </button>
+                            <button class="btn btn-primary" onclick="showAddUserModal()">
+                                <span class="material-icons" style="font-size:18px">person_add</span> Add User
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Display Name</th>
+                                    <th>Role</th>
+                                    <th>Groups</th>
+                                    <th>VPS Access</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ═══ Audit Logs Page (Admin Only) ═══ -->
+                <div id="page-audit" class="page">
+                    <div class="page-header">
+                        <h2>Audit Logs</h2>
+                        <button class="btn btn-primary" onclick="loadAuditLogs()">
+                            <span class="material-icons" style="font-size:16px">refresh</span> Refresh
+                        </button>
+                    </div>
+                    <div class="audit-filters" style="display:flex;gap:12px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
+                        <select id="auditActionFilter" onchange="loadAuditLogs()" style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text);font-size:13px;min-width:160px;">
+                            <option value="">All Actions</option>
+                            <option value="login">Login</option>
+                            <option value="logout">Logout</option>
+                            <option value="vps_create">VPS Create</option>
+                            <option value="vps_update">VPS Update</option>
+                            <option value="vps_delete">VPS Delete</option>
+                            <option value="container_start">Container Start</option>
+                            <option value="container_stop">Container Stop</option>
+                            <option value="container_restart">Container Restart</option>
+                            <option value="user_create">User Create</option>
+                            <option value="user_update">User Update</option>
+                            <option value="user_delete">User Delete</option>
+                            <option value="exec_command">Exec Command</option>
+                            <option value="terminal_connect">Terminal Connect</option>
+                            <option value="sshkey_create">SSH Key Create</option>
+                            <option value="sshkey_delete">SSH Key Delete</option>
+                            <option value="group_create">Group Create</option>
+                            <option value="group_update">Group Update</option>
+                            <option value="group_delete">Group Delete</option>
+                        </select>
+                        <input type="text" id="auditUserFilter" placeholder="Filter by user..." oninput="debounceAuditFilter()"
+                            style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text);font-size:13px;width:200px;">
+                        <span id="auditTotalCount" style="font-size:12px;color:var(--text-muted);"></span>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>User</th>
+                                    <th>Action</th>
+                                    <th>Resource</th>
+                                    <th>Details</th>
+                                    <th>IP</th>
+                                </tr>
+                            </thead>
+                            <tbody id="auditTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ═══ Permissions Page (Admin Only) ═══ -->
+                <div id="page-permissions" class="page">
+                    <div class="page-header">
+                        <h2>Role Permissions</h2>
+                    </div>
+                    <div style="margin-bottom:16px;">
+                        <p style="color:var(--text-muted);font-size:14px;">Overview of what each role can do in CloudCore.</p>
+                    </div>
+                    <div class="card" style="padding:0;overflow:hidden;">
+                        <table class="data-table" style="margin:0;">
+                            <thead>
+                                <tr>
+                                    <th style="min-width:260px;">Permission</th>
+                                    <th style="text-align:center;width:120px;">
+                                        <span style="display:inline-flex;align-items:center;gap:6px;">
+                                            <span class="material-icons" style="font-size:16px;color:var(--primary)">shield</span> Admin
+                                        </span>
+                                    </th>
+                                    <th style="text-align:center;width:120px;">
+                                        <span style="display:inline-flex;align-items:center;gap:6px;">
+                                            <span class="material-icons" style="font-size:16px;color:var(--warning)">build</span> Operator
+                                        </span>
+                                    </th>
+                                    <th style="text-align:center;width:120px;">
+                                        <span style="display:inline-flex;align-items:center;gap:6px;">
+                                            <span class="material-icons" style="font-size:16px;color:var(--neutral)">visibility</span> Viewer
+                                        </span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:8px;color:var(--text-muted)">dns</span>View VPS</td>
+                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                </tr>
+                                <tr>
+                                    <td><span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:8px;color:var(--text-muted)">terminal</span>SSH Terminal</td>
+                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                </tr>
+                                <tr>
+                                    <td><span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:8px;color:var(--text-muted)">bolt</span>Run Commands</td>
+                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                </tr>
+                                <tr>
+                                    <td><span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:8px;color:var(--text-muted)">add_circle</span>Manage VPS (Add/Edit/Delete)</td>
+                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                </tr>
+                                <tr>
+                                    <td><span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:8px;color:var(--text-muted)">people</span>Manage Users</td>
+                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                </tr>
+                                <tr>
+                                    <td><span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:8px;color:var(--text-muted)">receipt_long</span>View Audit Logs</td>
+                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                </tr>
+                                <tr>
+                                    <td><span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:8px;color:var(--text-muted)">view_in_ar</span>Manage Containers (Start/Stop/Restart)</td>
+                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="margin-top:24px;display:flex;gap:16px;flex-wrap:wrap;">
+                        <div class="card" style="flex:1;min-width:200px;">
+                            <div class="card-header">
+                                <span class="material-icons" style="font-size:18px;margin-right:8px;color:var(--primary)">shield</span>
+                                <h3>Admin</h3>
+                            </div>
+                            <div class="card-body" style="font-size:13px;color:var(--text-muted)">
+                                Full system access. Can manage VPS, users, containers, view audit logs, and use terminals. Can invite new members.
+                            </div>
+                        </div>
+                        <div class="card" style="flex:1;min-width:200px;">
+                            <div class="card-header">
+                                <span class="material-icons" style="font-size:18px;margin-right:8px;color:var(--warning)">build</span>
+                                <h3>Operator</h3>
+                            </div>
+                            <div class="card-body" style="font-size:13px;color:var(--text-muted)">
+                                Can view VPS, use SSH terminals, run commands, and manage containers. Cannot add/edit/delete VPS or manage users.
+                            </div>
+                        </div>
+                        <div class="card" style="flex:1;min-width:200px;">
+                            <div class="card-header">
+                                <span class="material-icons" style="font-size:18px;margin-right:8px;color:var(--neutral)">visibility</span>
+                                <h3>Viewer</h3>
+                            </div>
+                            <div class="card-body" style="font-size:13px;color:var(--text-muted)">
+                                Read-only access. Can view VPS instances, system info, resources, and container status. No terminal or command execution.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ SSH Keys Page (Admin Only) ═══ -->
+                <div id="page-ssh-keys" class="page">
+                    <div class="page-header">
+                        <h2>SSH Keys</h2>
+                        <button class="btn btn-primary" onclick="showAddSSHKeyModal()">
+                            <span class="material-icons" style="font-size:18px">vpn_key</span> Add SSH Key
+                        </button>
+                    </div>
+                    <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;">
+                        Manage SSH key files stored on the dashboard server. When adding a new VPS with key authentication, you can select from these saved keys.
+                    </p>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Key File Path</th>
+                                    <th>Public Key</th>
+                                    <th>Fingerprint</th>
+                                    <th>Added</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sshKeysTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ═══ Groups Page (Admin Only) ═══ -->
+                <div id="page-groups" class="page">
+                    <div class="page-header">
+                        <h2>Groups</h2>
+                        <button class="btn btn-primary" onclick="showCreateGroupModal()">
+                            <span class="material-icons" style="font-size:18px">create_new_folder</span> Create Group
+                        </button>
+                    </div>
+                    <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;">
+                        Organize VPS instances into groups. Grant users access to a group to give them access to all VPS in that group.
+                    </p>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th>VPS</th>
+                                    <th>Members</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="groupsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ═══ GitHub Actions Page (Admin Only) ═══ -->
+                <div id="page-github" class="page">
+                    <div class="page-header">
+                        <h2>GitHub Actions</h2>
+                        <button class="btn btn-primary" onclick="refreshGitHubActions()">
+                            <span class="material-icons" style="font-size:16px">sync</span> Refresh
+                        </button>
+                    </div>
+
+                    <!-- Stats Row -->
+                    <div class="stats-row">
+                        <div class="stat-card" style="border-left:3px solid var(--primary);">
+                            <div class="stat-value" id="ghTotalRepos">0</div>
+                            <div class="stat-label">Total Repos</div>
+                        </div>
+                        <div class="stat-card" style="border-left:3px solid #22C55E;">
+                            <div class="stat-value" id="ghSuccessCount" style="color:#22C55E;">0</div>
+                            <div class="stat-label">Success</div>
+                        </div>
+                        <div class="stat-card" style="border-left:3px solid #EF4444;">
+                            <div class="stat-value" id="ghFailedCount" style="color:#EF4444;">0</div>
+                            <div class="stat-label">Failed</div>
+                        </div>
+                        <div class="stat-card" style="border-left:3px solid #F59E0B;">
+                            <div class="stat-value" id="ghRunningCount" style="color:#F59E0B;">0</div>
+                            <div class="stat-label">Running</div>
+                        </div>
+                    </div>
+
+                    <!-- Configuration Panel (Collapsible) -->
+                    <div style="background:var(--card);border-radius:8px;border:1px solid var(--border);margin-bottom:16px;">
+                        <div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleGitHubConfig()">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span class="material-icons" style="font-size:18px;color:var(--text-muted);">settings</span>
+                                <span style="font-weight:500;">Configuration</span>
+                            </div>
+                            <span class="material-icons" id="ghConfigToggleIcon" style="font-size:20px;color:var(--text-muted);transition:transform 0.2s;">expand_more</span>
+                        </div>
+                        <div id="ghConfigPanel" style="display:none;padding:0 16px 16px;">
+                            <!-- GitHub Tokens -->
+                            <div style="margin-bottom:16px;">
+                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                                    <h4 style="margin:0;display:flex;align-items:center;gap:6px;">
+                                        <span class="material-icons" style="font-size:16px;">token</span> GitHub Tokens
+                                    </h4>
+                                    <button class="btn btn-xs btn-primary" onclick="showAddTokenModal()">
+                                        <span class="material-icons" style="font-size:14px;">add</span> Add Token
+                                    </button>
+                                </div>
+                                <div class="table-wrapper">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Token</th>
+                                                <th>GitHub User</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="ghTokensTableBody">
+                                            <tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px;">No tokens added</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <!-- Tracked Repositories -->
+                            <div>
+                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                                    <h4 style="margin:0;display:flex;align-items:center;gap:6px;">
+                                        <span class="material-icons" style="font-size:16px;">source</span> Tracked Repositories
+                                    </h4>
+                                    <button class="btn btn-xs btn-primary" onclick="showAddRepoModal()">
+                                        <span class="material-icons" style="font-size:14px;">add</span> Add Repo
+                                    </button>
+                                </div>
+                                <div class="table-wrapper">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Token</th>
+                                                <th>Repository</th>
+                                                <th>Branch</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="ghReposTableBody">
+                                            <tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px;">No repos tracked</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Workflow Runs -->
+                    <div id="ghWorkflowRuns">
+                        <div class="empty-state">
+                            <span class="material-icons empty-icon" style="font-size:48px;color:var(--text-muted);">rocket_launch</span>
+                            <p style="color:var(--text-muted);">Add a token and repository to see workflow runs.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ VPS Detail Page ═══ -->
+                <div id="page-vps-detail" class="page">
+                    <div class="page-header">
+                        <div class="breadcrumb">
+                            <a href="#" onclick="showPage('vps-list')">Instances</a>
+                            <span class="material-icons breadcrumb-sep">chevron_right</span>
+                            <span id="detailVPSName">Loading...</span>
+                        </div>
+                        <div class="header-actions">
+                            <button class="btn btn-sm" onclick="refreshVPSDetail()">
+                                <span class="material-icons" style="font-size:16px">refresh</span> Refresh
+                            </button>
+                            <button id="openTerminalBtn" class="btn btn-sm btn-primary" onclick="openTerminal(currentVPSId)">
+                                <span class="material-icons" style="font-size:16px">terminal</span> Terminal
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- System Info + Resources -->
+                    <div class="detail-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <span class="material-icons" style="font-size:18px;margin-right:8px">info</span>
+                                <h3>System Info</h3>
+                            </div>
+                            <div class="card-body" id="vpsInfoBody">
+                                <div class="loading">Loading...</div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <span class="material-icons" style="font-size:18px;margin-right:8px">monitoring</span>
+                                <h3>Resources</h3>
+                            </div>
+                            <div class="card-body" id="vpsResourceBody">
+                                <div class="loading">Loading...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="tabs">
+                        <button class="tab active" data-tab="containers" onclick="switchTab('containers')">
+                            <span class="material-icons" style="font-size:16px;margin-right:4px">view_in_ar</span> Containers
+                        </button>
+                        <button class="tab" data-tab="logs" onclick="switchTab('logs')">
+                            <span class="material-icons" style="font-size:16px;margin-right:4px">article</span> System Logs
+                        </button>
+                        <button id="tabBtnTerminal" class="tab" data-tab="terminal" onclick="switchTab('terminal')">
+                            <span class="material-icons" style="font-size:16px;margin-right:4px">terminal</span> Terminal
+                        </button>
+                        <button id="tabBtnQuickCmd" class="tab" data-tab="quickcmd" onclick="switchTab('quickcmd')">
+                            <span class="material-icons" style="font-size:16px;margin-right:4px">bolt</span> Quick Command
+                        </button>
+                    </div>
+
+                    <!-- Tab: Containers -->
+                    <div id="tab-containers" class="tab-content active">
+                        <div id="containerList">
+                            <div class="loading">Loading containers...</div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Logs -->
+                    <div id="tab-logs" class="tab-content">
+                        <div class="log-controls">
+                            <select id="logType">
+                                <option value="syslog">System Log</option>
+                                <option value="auth">Auth / SSH</option>
+                                <option value="kernel">Kernel</option>
+                                <option value="docker">Docker</option>
+                                <option value="nginx">Nginx</option>
+                            </select>
+                            <input type="number" id="logTail" value="200" min="10" max="1000" style="width:100px">
+                            <button class="btn btn-sm btn-primary" onclick="loadVPSLogs()">
+                                <span class="material-icons" style="font-size:14px">play_arrow</span> Load
+                            </button>
+                        </div>
+                        <pre class="log-viewer" id="logViewer">Select log type and click Load</pre>
+                    </div>
+
+                    <!-- Tab: Terminal -->
+                    <div id="tab-terminal" class="tab-content">
+                        <div class="terminal-wrapper">
+                            <div id="terminalSessionBar" class="terminal-session-bar">
+                                <!-- Dynamic session tabs will be added here -->
+                            </div>
+                            <div class="terminal-bar">
+                                <div class="terminal-bar-left">
+                                    <span class="material-icons" style="font-size:14px;margin-right:6px">terminal</span>
+                                    <span id="terminalStatus">Disconnected</span>
+                                </div>
+                                <div class="terminal-bar-right">
+                                    <button class="btn btn-xs btn-primary" onclick="connectTerminal()">Connect</button>
+                                    <button class="btn btn-xs" onclick="disconnectTerminal()">Disconnect</button>
+                                    <button class="btn btn-xs" onclick="toggleTerminalFullscreen()" title="Toggle Fullscreen">
+                                        <span class="material-icons" style="font-size:14px">fullscreen</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="terminalSessionsContainer" class="terminal-sessions-container">
+                                <!-- Per-session terminal containers are dynamically created here -->
+                            </div>
+                            <div id="terminalContainer" class="terminal-container"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Quick Command -->
+                    <div id="tab-quickcmd" class="tab-content">
+                        <div class="quick-cmd">
+                            <div class="cmd-presets">
+                                <button class="btn btn-sm" onclick="runQuickCmd('uptime')">uptime</button>
+                                <button class="btn btn-sm" onclick="runQuickCmd('df -h')">df -h</button>
+                                <button class="btn btn-sm" onclick="runQuickCmd('free -m')">free -m</button>
+                                <button class="btn btn-sm" onclick="runQuickCmd('docker ps')">docker ps</button>
+                                <button class="btn btn-sm" onclick="runQuickCmd('docker stats --no-stream')">docker stats</button>
+                                <button class="btn btn-sm" onclick="runQuickCmd('top -bn1 | head -20')">top</button>
+                                <button class="btn btn-sm" onclick="runQuickCmd('netstat -tlnp 2>/dev/null || ss -tlnp')">ports</button>
+                                <button class="btn btn-sm" onclick="runQuickCmd('iptables -L -n 2>/dev/null | head -30')">firewall</button>
+                            </div>
+                            <div class="cmd-input-row">
+                                <input type="text" id="quickCmdInput" placeholder="Enter command..." onkeydown="if(event.key==='Enter')runQuickCmd()">
+                                <button class="btn btn-primary" onclick="runQuickCmd()">
+                                    <span class="material-icons" style="font-size:16px">play_arrow</span> Run
+                                </button>
+                            </div>
+                            <pre class="cmd-output" id="quickCmdOutput">Output will appear here...</pre>
+                        </div>
+                    </div>
+                </div>
+
+
+</main>
+        </div>
+    </div>
+
+    <!-- ═══ Add/Edit VPS Modal (Multi-Step Wizard) ═══ -->
+    <div id="vpsModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeVPSModal()"></div>
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="vpsModalTitle">Add VPS</h3>
+                <button class="modal-close" onclick="closeVPSModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <input type="hidden" id="vpsEditId">
+
+            <!-- Step Indicator -->
+            <div id="wizardSteps" style="display:flex;align-items:center;padding:16px 24px 0;gap:0;">
+                <div class="wizard-step active" id="wizardStep1" onclick="goToWizardStep(1)">
+                    <div class="wizard-step-circle">1</div>
+                    <div class="wizard-step-label">Connection</div>
+                </div>
+                <div class="wizard-step-line" id="wizardLine1"></div>
+                <div class="wizard-step" id="wizardStep2" onclick="goToWizardStep(2)">
+                    <div class="wizard-step-circle">2</div>
+                    <div class="wizard-step-label">Test</div>
+                </div>
+                <div class="wizard-step-line" id="wizardLine2"></div>
+                <div class="wizard-step" id="wizardStep3" onclick="goToWizardStep(3)">
+                    <div class="wizard-step-circle">3</div>
+                    <div class="wizard-step-label">Details</div>
+                </div>
+                <div class="wizard-step-line" id="wizardLine3"></div>
+                <div class="wizard-step" id="wizardStep4" onclick="goToWizardStep(4)">
+                    <div class="wizard-step-circle">4</div>
+                    <div class="wizard-step-label">Confirm</div>
+                </div>
+            </div>
+
+            <!-- Step 1: Connection Info -->
+            <div id="wizardPage1" class="wizard-page" style="padding:16px 24px;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Host / IP *</label>
+                        <input type="text" id="vpsHost" required placeholder="192.168.1.100">
+                    </div>
+                    <div class="form-group">
+                        <label>SSH Port</label>
+                        <input type="number" id="vpsPort" value="22">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="vpsUsername" value="root" placeholder="root">
+                    </div>
+                    <div class="form-group">
+                        <label>Auth Method</label>
+                        <div style="display:flex;gap:8px;margin-top:4px;">
+                            <button type="button" class="btn btn-sm btn-primary" id="authMethodPassword" onclick="setAuthMethod('password')">Password</button>
+                            <button type="button" class="btn btn-sm" id="authMethodKey" onclick="setAuthMethod('key')">SSH Key</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row" id="authPasswordField">
+                    <div class="form-group" style="flex:1">
+                        <label>Password</label>
+                        <input type="password" id="vpsPassword" placeholder="SSH password">
+                    </div>
+                </div>
+                <div class="form-row hidden" id="authKeyField">
+                    <div class="form-group" style="flex:1">
+                        <label>SSH Key</label>
+                        <select id="vpsKeySelect" onchange="onSSHKeySelected()" style="margin-bottom:8px;">
+                            <option value="">-- Select a saved key --</option>
+                            <!-- Options loaded dynamically -->
+                        </select>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                            <div style="flex:1;height:1px;background:var(--border);"></div>
+                            <span style="font-size:11px;color:var(--text-muted);">OR enter manually</span>
+                            <div style="flex:1;height:1px;background:var(--border);"></div>
+                        </div>
+                        <input type="text" id="vpsKeyFile" placeholder="/root/.ssh/id_rsa">
+                        <small style="color:var(--text-muted);font-size:11px;margin-top:4px;display:block;">Path to private key file on the dashboard server</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Test Connection -->
+            <div id="wizardPage2" class="wizard-page hidden" style="padding:16px 24px;text-align:center;">
+                <div id="testConnectionStatus" style="padding:40px 0;">
+                    <span class="material-icons" style="font-size:48px;color:var(--neutral)">lan</span>
+                    <p style="margin-top:12px;color:var(--text-muted);">Click the button below to test your SSH connection.</p>
+                </div>
+                <button type="button" class="btn btn-primary" id="testConnectionBtn" onclick="testVPSConnection()">
+                    <span class="material-icons" style="font-size:16px">play_arrow</span> Test Connection
+                </button>
+            </div>
+
+            <!-- Step 3: Details -->
+            <div id="wizardPage3" class="wizard-page hidden" style="padding:16px 24px;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Name *</label>
+                        <input type="text" id="vpsName" required placeholder="My Server">
+                    </div>
+                    <div class="form-group">
+                        <label>Group</label>
+                        <select id="vpsGroup">
+                            <option value="default">default</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1">
+                        <label>Tags (comma separated)</label>
+                        <input type="text" id="vpsTags" placeholder="production, web">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: Confirm -->
+            <div id="wizardPage4" class="wizard-page hidden" style="padding:16px 24px;">
+                <div id="wizardConfirmSummary" style="font-size:13px;">
+                    <!-- Filled dynamically -->
+                </div>
+            </div>
+
+            <!-- Wizard Footer -->
+            <div class="modal-footer" style="padding:16px 24px;">
+                <button type="button" class="btn btn-secondary" id="wizardCancelBtn" onclick="closeVPSModal()">Cancel</button>
+                <button type="button" class="btn btn-secondary" id="wizardPrevBtn" onclick="prevAddStep()" style="display:none;">
+                    <span class="material-icons" style="font-size:16px">arrow_back</span> Back
+                </button>
+                <button type="button" class="btn btn-primary" id="wizardNextBtn" onclick="nextAddStep()">
+                    Next <span class="material-icons" style="font-size:16px">arrow_forward</span>
+                </button>
+                <button type="button" class="btn btn-primary hidden" id="wizardSaveBtn" onclick="saveVPSFromWizard()">
+                    <span class="material-icons" style="font-size:16px">add_circle</span> Add Instance
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Container Logs Modal ═══ -->
+    <div id="containerLogModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeContainerLogModal()"></div>
+        <div class="modal-card modal-lg">
+            <div class="modal-header">
+                <h3 id="containerLogTitle">Container Logs</h3>
+                <button class="modal-close" onclick="closeContainerLogModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div class="log-controls" style="padding: 16px 24px 0;">
+                <input type="number" id="containerLogTail" value="200" min="10" max="2000" style="width:100px">
+                <button class="btn btn-sm btn-primary" onclick="loadContainerLogsWithTail()">Load</button>
+            </div>
+            <pre class="log-viewer" id="containerLogViewer" style="margin: 16px 24px 24px;">Loading logs...</pre>
+        </div>
+    </div>
+
+    <!-- ═══ Container Stats Modal ═══ -->
+    <div id="containerStatsModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeContainerStatsModal()"></div>
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="containerStatsTitle">Container Stats</h3>
+                <button class="modal-close" onclick="closeContainerStatsModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div id="containerStatsBody" class="card-body"></div>
+        </div>
+    </div>
+
+    <!-- ═══ Add/Edit User Modal ═══ -->
+    <div id="userModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeUserModal()"></div>
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="userModalTitle">Add User</h3>
+                <button class="modal-close" onclick="closeUserModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <form id="userForm" onsubmit="saveUser(event)">
+                <input type="hidden" id="userEditId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Username *</label>
+                        <input type="text" id="userUsername" required placeholder="username">
+                    </div>
+                    <div class="form-group">
+                        <label>Display Name</label>
+                        <input type="text" id="userDisplayName" placeholder="John Doe">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Password <span id="userPasswordHint" style="font-weight:normal;font-size:12px;color:var(--neutral)">(required for new users)</span></label>
+                        <input type="password" id="userPassword" placeholder="Password">
+                    </div>
+                    <div class="form-group">
+                        <label>Role</label>
+                        <select id="userRole">
+                            <option value="viewer">Viewer</option>
+                            <option value="operator">Operator</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ═══ VPS Access Assignment Modal ═══ -->
+    <div id="vpsAccessModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeVPSAccessModal()"></div>
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="vpsAccessTitle">VPS Access</h3>
+                <button class="modal-close" onclick="closeVPSAccessModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <input type="hidden" id="vpsAccessUserId">
+            <p style="font-size:13px;color:var(--neutral);margin-bottom:12px;padding: 0 24px;">
+                Select which VPS this user can access. Leave all unchecked for <strong>full access</strong> to all VPS.
+            </p>
+            <div id="vpsAccessCheckboxes" style="max-height:300px;overflow-y:auto;padding: 0 24px;"></div>
+            <p id="vpsAccessGroupNote" style="font-size:11px;color:var(--text-muted);padding:0 24px;margin-top:8px;"></p>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeVPSAccessModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveVPSAccess()">Save Access</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Invite Member Modal ═══ -->
+    <div id="inviteModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeInviteModal()"></div>
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Invite Member</h3>
+                <button class="modal-close" onclick="closeInviteModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div style="padding:16px 24px;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="inviteUsername" placeholder="username">
+                    </div>
+                    <div class="form-group">
+                        <label>Display Name</label>
+                        <input type="text" id="inviteDisplayName" placeholder="John Doe">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Role</label>
+                        <select id="inviteRole">
+                            <option value="viewer">Viewer</option>
+                            <option value="operator">Operator</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="inviteResult" class="hidden" style="margin-top:16px;padding:16px;border-radius:8px;background:var(--tertiary);border:1px solid var(--border);">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                        <span class="material-icons" style="font-size:18px;color:var(--success)">check_circle</span>
+                        <span style="font-weight:500;">Invite Link Generated</span>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <input type="text" id="inviteLink" readonly style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--secondary);color:var(--text);font-size:12px;font-family:'JetBrains Mono',monospace;">
+                        <button class="btn btn-sm btn-primary" onclick="copyInviteLink()">
+                            <span class="material-icons" style="font-size:14px">content_copy</span> Copy
+                        </button>
+                    </div>
+                    <p style="font-size:12px;color:var(--text-muted);margin-top:8px;">This link expires in 7 days.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeInviteModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" id="generateInviteBtn" onclick="generateInvite()">
+                    <span class="material-icons" style="font-size:16px">link</span> Generate Invite Link
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Add SSH Key Modal ═══ -->
+    <div id="sshKeyModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeSSHKeyModal()"></div>
+        <div class="modal-card" style="max-width:560px;">
+            <div class="modal-header">
+                <h3 id="sshKeyModalTitle">Add SSH Key</h3>
+                <button class="modal-close" onclick="closeSSHKeyModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div style="padding:16px 24px;">
+                <div class="form-group">
+                    <label>Key Name *</label>
+                    <input type="text" id="sshKeyName" placeholder="e.g. Production Key, Hetzner Root">
+                </div>
+
+                <!-- Key Type Selector -->
+                <div class="form-group" style="margin-top:12px;">
+                    <label>Key Input Mode</label>
+                    <div style="display:flex;gap:6px;margin-top:4px;">
+                        <button type="button" id="sshKeyTypeFile" class="btn btn-xs btn-primary" onclick="setSSHKeyType('file')" style="flex:1;">
+                            <span class="material-icons" style="font-size:14px">folder</span> File Path
+                        </button>
+                        <button type="button" id="sshKeyTypePasted" class="btn btn-xs" onclick="setSSHKeyType('pasted')" style="flex:1;">
+                            <span class="material-icons" style="font-size:14px">content_paste</span> Paste Private Key
+                        </button>
+                        <button type="button" id="sshKeyTypePublicOnly" class="btn btn-xs" onclick="setSSHKeyType('public_only')" style="flex:1;">
+                            <span class="material-icons" style="font-size:14px">vpn_key</span> Public Key Only
+                        </button>
+                    </div>
+                </div>
+
+                <!-- File Path Mode -->
+                <div id="sshKeyFileSection" class="form-group" style="margin-top:12px;">
+                    <label>Private Key File Path *</label>
+                    <input type="text" id="sshKeyFile" placeholder="/root/.ssh/id_rsa">
+                    <small style="color:var(--text-muted);font-size:11px;margin-top:4px;display:block;">Path to the private key file on the dashboard server</small>
+                </div>
+
+                <!-- Pasted Private Key Mode -->
+                <div id="sshKeyPastedSection" class="form-group" style="margin-top:12px;display:none;">
+                    <label>Private Key Content *</label>
+                    <textarea id="sshPrivateKey" rows="6" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text);font-size:11px;font-family:'JetBrains Mono',monospace;resize:vertical;"></textarea>
+                    <small style="color:var(--text-muted);font-size:11px;margin-top:4px;display:block;">Paste the full private key in PEM or OpenSSH format. It will be saved securely.</small>
+                </div>
+
+                <!-- Public Key (always available) -->
+                <div class="form-group" style="margin-top:12px;">
+                    <label>Public Key <span id="sshPublicKeyLabel" style="color:var(--text-muted);font-weight:normal;">(optional)</span></label>
+                    <textarea id="sshPublicKey" rows="2" placeholder="ssh-rsa AAAA... (paste public key for reference)" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text);font-size:12px;font-family:'JetBrains Mono',monospace;resize:vertical;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeSSHKeyModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveSSHKey()">
+                    <span class="material-icons" style="font-size:16px">vpn_key</span> Save Key
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Create/Edit Group Modal ═══ -->
+    <div id="groupModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeGroupModal()"></div>
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="groupModalTitle">Create Group</h3>
+                <button class="modal-close" onclick="closeGroupModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div style="padding:16px 24px;">
+                <input type="hidden" id="groupEditId">
+                <div class="form-row">
+                    <div class="form-group" style="flex:1">
+                        <label>Group Name *</label>
+                        <input type="text" id="groupName" placeholder="e.g. Production, Staging">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1">
+                        <label>Description</label>
+                        <textarea id="groupDescription" rows="2" placeholder="Describe this group..." style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text);font-size:13px;resize:vertical;"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeGroupModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveGroup()">
+                    <span class="material-icons" style="font-size:16px">create_new_folder</span> Save Group
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Group Detail Modal ═══ -->
+    <div id="groupDetailModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeGroupDetailModal()"></div>
+        <div class="modal-card modal-lg">
+            <div class="modal-header">
+                <h3 id="groupDetailTitle">Group Details</h3>
+                <button class="modal-close" onclick="closeGroupDetailModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div style="padding:16px 24px;">
+                <div id="groupDetailBody">
+                    Loading...
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeGroupDetailModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Add VPS to Group Modal ═══ -->
+    <div id="addVPSToGroupModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeAddVPSToGroupModal()"></div>
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="addVPSToGroupTitle">Add VPS to Group</h3>
+                <button class="modal-close" onclick="closeAddVPSToGroupModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <input type="hidden" id="addVPSGroupId">
+            <p style="font-size:13px;color:var(--neutral);padding:0 24px;margin-bottom:8px;">
+                Select VPS instances to add to this group. They will be moved from their current group.
+            </p>
+            <div id="addVPSToGroupCheckboxes" style="max-height:350px;overflow-y:auto;padding:0 24px;"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeAddVPSToGroupModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveVPSToGroup()">
+                    <span class="material-icons" style="font-size:16px">save</span> Save
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Remove VPS from Group Modal ═══ -->
+    <div id="removeVPSFromGroupModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeRemoveVPSFromGroupModal()"></div>
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="removeVPSFromGroupTitle">Remove VPS from Group</h3>
+                <button class="modal-close" onclick="closeRemoveVPSFromGroupModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <input type="hidden" id="removeVPSGroupId">
+            <p style="font-size:13px;color:var(--neutral);padding:0 24px;margin-bottom:8px;">
+                Select VPS instances to remove from this group. They will be moved back to <strong>default</strong>.
+            </p>
+            <div id="removeVPSFromGroupCheckboxes" style="max-height:350px;overflow-y:auto;padding:0 24px;"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeRemoveVPSFromGroupModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" style="background:var(--warning)" onclick="saveRemoveVPSFromGroup()">
+                    <span class="material-icons" style="font-size:16px">remove_circle</span> Remove
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Group Access Assignment Modal ═══ -->
+    <div id="groupAccessModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeGroupAccessModal()"></div>
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="groupAccessTitle">Group Access</h3>
+                <button class="modal-close" onclick="closeGroupAccessModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <input type="hidden" id="groupAccessUserId">
+            <p style="font-size:13px;color:var(--neutral);margin-bottom:12px;padding: 0 24px;">
+                Select groups to grant this user access to all VPS in each group.
+            </p>
+            <div id="groupAccessCheckboxes" style="max-height:300px;overflow-y:auto;padding: 0 24px;"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeGroupAccessModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveGroupAccess()">Save Access</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Add GitHub Token Modal ═══ -->
+    <div id="addTokenModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeAddTokenModal()"></div>
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Add GitHub Token</h3>
+                <button class="modal-close" onclick="closeAddTokenModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div style="padding:16px 24px;">
+                <div class="form-group">
+                    <label>Token Name *</label>
+                    <input type="text" id="ghTokenName" placeholder="e.g. My Org PAT">
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label>Personal Access Token *</label>
+                    <input type="password" id="ghTokenValue" placeholder="ghp_xxxxxxxxxxxx">
+                    <small style="color:var(--text-muted);font-size:11px;margin-top:4px;display:block;">GitHub PAT with `repo` and `workflow` scopes</small>
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label>GitHub Username / Org</label>
+                    <input type="text" id="ghTokenUser" placeholder="optional">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeAddTokenModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveToken()">
+                    <span class="material-icons" style="font-size:16px;">token</span> Save Token
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Add GitHub Repo Modal ═══ -->
+    <div id="addRepoModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeAddRepoModal()"></div>
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Track Repository</h3>
+                <button class="modal-close" onclick="closeAddRepoModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div style="padding:16px 24px;">
+                <!-- Repo Type Toggle -->
+                <div style="display:flex;gap:8px;margin-bottom:16px;">
+                    <button id="repoModeToken" onclick="setRepoMode('token')" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:#fff;font-size:12px;font-weight:600;cursor:pointer;">
+                        🔑 With Token (Private)
+                    </button>
+                    <button id="repoModePublic" onclick="setRepoMode('public')" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text-muted);font-size:12px;font-weight:600;cursor:pointer;">
+                        🌐 Public Repository
+                    </button>
+                </div>
+
+                <!-- Token-based fields -->
+                <div id="repoTokenFields">
+                    <div class="form-group">
+                        <label>Token *</label>
+                        <select id="ghRepoTokenSelect" onchange="onRepoTokenChange()" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text);font-size:13px;">
+                            <option value="">-- Select a token --</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-top:12px;">
+                        <label>Repository *</label>
+                        <select id="ghRepoSelect" onchange="onRepoSelectChange()" disabled style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text);font-size:13px;">
+                            <option value="">-- Select a token first --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Public repo fields -->
+                <div id="repoPublicFields" style="display:none;">
+                    <div class="form-group">
+                        <label>Repository (owner/repo) *</label>
+                        <div style="position:relative;">
+                            <input type="text" id="ghPublicRepoInput" placeholder="e.g. facebook/react" oninput="onPublicRepoInput()" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text);font-size:13px;" />
+                            <span id="ghPublicRepoStatus" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:14px;"></span>
+                        </div>
+                        <div id="ghPublicRepoInfo" style="margin-top:6px;font-size:11px;color:var(--text-muted);display:none;"></div>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top:12px;">
+                    <label>Branch</label>
+                    <select id="ghBranchSelect" disabled style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text);font-size:13px;">
+                        <option value="">All branches</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeAddRepoModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveRepo()">
+                    <span class="material-icons" style="font-size:16px;">source</span> Track Repo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Edit Repo Branch Modal ═══ -->
+    <div id="editRepoModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeEditRepoModal()"></div>
+        <div class="modal-card" style="max-width:420px;">
+            <div class="modal-header">
+                <h3>Edit Branch</h3>
+                <button class="modal-close" onclick="closeEditRepoModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div style="padding:16px 24px;">
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Repository</label>
+                    <div id="editRepoName" style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--text);margin-top:2px;"></div>
+                </div>
+                <div class="form-group">
+                    <label>Branch</label>
+                    <select id="editRepoBranchSelect" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text);font-size:13px;">
+                        <option value="">All branches</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeEditRepoModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveEditRepo()">
+                    <span class="material-icons" style="font-size:16px;">save</span> Save
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Toast Container ═══ -->
+    <div id="toastContainer"></div>
+
+    <!-- ═══ Confirm Modal ═══ -->
+    <div id="confirmModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeConfirmModal()"></div>
+        <div class="modal-card">
+            <div class="confirm-body">
+                <span class="material-icons confirm-icon">warning_amber</span>
+                <div class="confirm-title">Confirm Action</div>
+                <div class="confirm-message" id="confirmMessage"></div>
+            </div>
+            <div class="modal-footer" style="justify-content:center;gap:12px;">
+                <button type="button" class="btn btn-secondary" onclick="closeConfirmModal()">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmOkBtn" onclick="confirmOk()">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Audit Detail Modal ═══ -->
+    <div id="auditDetailModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeAuditDetailModal()"></div>
+        <div class="modal-card modal-lg">
+            <div class="modal-header">
+                <h3>Event Details</h3>
+                <button class="modal-close" onclick="closeAuditDetailModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div class="audit-detail-content">
+                <dl class="audit-detail-meta" id="auditDetailMeta"></dl>
+                <div class="audit-detail-json" id="auditDetailJson"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js?v=22"></script>
+</body>
+</html>
