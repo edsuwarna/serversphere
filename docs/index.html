@@ -42,17 +42,13 @@
         .hero .badge { display: inline-block; background: #1f6feb22; border: 1px solid #1f6feb44; color: var(--accent); padding: 6px 16px; border-radius: 20px; font-size: 14px; font-weight: 500; }
         .hero .badge-green { background: #23863622; border-color: #2ea04344; color: var(--green); }
         .hero .badge-orange { background: #d2992222; border-color: #d2992244; color: #d29922; }
-        .hero-btns { margin-top: 32px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; border-radius: 8px; font-size: 15px; font-weight: 600; text-decoration: none; transition: all 0.2s; }
+        .hero-btns { margin-top: 32px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 28px; border-radius: 8px; font-size: 15px; font-weight: 600; text-decoration: none; transition: all 0.2s; }
+        .hero-btns .btn { width: 100%; max-width: 360px; text-align: center; }
         .btn-primary { background: var(--btn-primary-bg); color: #fff; border: 1px solid var(--btn-primary-border); }
         .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
         .btn-secondary { background: var(--btn-secondary-bg); color: var(--text); border: 1px solid var(--btn-secondary-border); }
         .btn-secondary:hover { background: var(--bg3); }
-
-        @media (max-width: 600px) {
-            .hero-btns { flex-direction: column; align-items: center; }
-            .hero-btns .btn { width: 100%; max-width: 360px; text-align: center; justify-content: center; }
-        }
 
         .section-title { font-size: 22px; font-weight: 700; margin: 50px 0 20px; text-align: center; }
         .features { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin: 30px 0; }
