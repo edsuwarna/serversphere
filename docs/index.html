@@ -58,6 +58,18 @@
         .feature-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
         .feature-card p { font-size: 13px; color: var(--text2); line-height: 1.5; }
         .quickstart-box { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 30px; margin: 30px 0; }
+        .code-block { position: relative; }
+        .copy-btn {
+            position: absolute; top: 8px; right: 8px; z-index: 10;
+            background: var(--bg3); border: 1px solid var(--border);
+            border-radius: 6px; width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 14px; opacity: 0; transition: all 0.2s;
+            color: var(--text2);
+        }
+        .code-block:hover .copy-btn { opacity: 1; }
+        .copy-btn:hover { background: var(--accent); color: #fff; }
+        .copy-btn.copied { opacity: 1; background: var(--green); color: #fff; }
         .quickstart-box h2 { font-size: 18px; margin-bottom: 12px; }
         .quickstart-box code { display: block; background: var(--bg3); padding: 16px 20px; border-radius: 6px; font-size: 14px; line-height: 1.8; overflow-x: auto; }
         .quickstart-box .comment { color: var(--text2); }
@@ -118,6 +130,7 @@
     <!-- Quick Start -->
     <h2 class="section-title">⚡ Quick Start</h2>
     <div class="quickstart-box">
+        <div class="code-block">
         <code>
             <span class="comment"># 1. Clone & launch</span>
             git clone https://github.com/edsuwarna/serversphere.git<br>
@@ -126,6 +139,7 @@
             <span class="comment"># http://your-server-ip:8080</span>
             <span class="comment"># Login: admin / change-me</span>
         </code>
+        </div>
     </div>
 
     <!-- Footer -->
@@ -147,6 +161,26 @@
         document.getElementById('themeToggle').addEventListener('click', toggleTheme);
         const saved = localStorage.getItem('serversphere-theme');
         if (saved) setTheme(saved);
+
+        function copyCode(btn) {
+            const code = btn.parentElement.querySelector('code');
+            const text = Array.from(code.childNodes).map(n =>
+                n.nodeType === 1 && n.tagName === 'BR' ? '\n' : n.textContent
+            ).join('').trim();
+            navigator.clipboard.writeText(text).then(() => {
+                btn.textContent = '✅';
+                btn.classList.add('copied');
+                setTimeout(() => { btn.textContent = '📋'; btn.classList.remove('copied'); }, 1500);
+            });
+        }
+        document.querySelectorAll('.code-block code').forEach(code => {
+            const btn = document.createElement('button');
+            btn.className = 'copy-btn';
+            btn.textContent = '📋';
+            btn.title = 'Copy';
+            btn.addEventListener('click', () => copyCode(btn));
+            code.parentElement.appendChild(btn);
+        });
     </script>
 </body>
 </html>
