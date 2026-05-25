@@ -34,7 +34,7 @@
         .theme-toggle { position: fixed; top: 12px; right: 12px; z-index: 300; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
         .theme-toggle:hover { background: var(--bg3); }
         .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
-        .hero { padding: 80px 0 60px; text-align: center; background: linear-gradient(180deg, var(--hero-bg-start) 0%, var(--hero-bg-end) 100%); border-bottom: 1px solid var(--border); }
+        .hero { padding: 80px 0 60px; text-align: center; background: linear-gradient(180deg, var(--hero-bg-start) 0%, var(--hero-bg-end) 100%); }
         .hero-icon { font-size: 64px; margin-bottom: 16px; }
         .hero h1 { font-size: 48px; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 12px; }
         .hero .tagline { font-size: 18px; color: var(--text2); max-width: 600px; margin: 0 auto; }
@@ -51,7 +51,7 @@
 
         @media (max-width: 600px) {
             .hero-btns { flex-direction: column; align-items: center; }
-            .hero-btns .btn { width: 100%; max-width: 360px; text-align: center; }
+            .hero-btns .btn { width: 100%; max-width: 360px; text-align: center; justify-content: center; }
         }
 
         .section-title { font-size: 22px; font-weight: 700; margin: 50px 0 20px; text-align: center; }
