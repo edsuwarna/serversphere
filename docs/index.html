@@ -48,6 +48,12 @@
         .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
         .btn-secondary { background: var(--btn-secondary-bg); color: var(--text); border: 1px solid var(--btn-secondary-border); }
         .btn-secondary:hover { background: var(--bg3); }
+
+        @media (max-width: 600px) {
+            .hero-btns { flex-direction: column; align-items: center; }
+            .hero-btns .btn { width: 100%; max-width: 280px; text-align: center; }
+        }
+
         .section-title { font-size: 22px; font-weight: 700; margin: 50px 0 20px; text-align: center; }
         .features { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin: 30px 0; }
         .feature-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: 24px; transition: all 0.2s; }
