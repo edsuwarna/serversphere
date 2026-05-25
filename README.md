@@ -1,4 +1,4 @@
-# VPS Dashboard - Multi-Server Management
+# ServerSphere - Multi-Server Management
 
 A single-page web dashboard for managing multiple VPS servers via SSH.
 
@@ -19,7 +19,7 @@ A single-page web dashboard for managing multiple VPS servers via SSH.
 
 ```bash
 # 1. Clone or copy the project
-cd vps-dashboard
+cd serversphere
 
 # 2. (Optional) Edit credentials
 cp .env.example .env
@@ -89,8 +89,8 @@ The dashboard mounts `~/.ssh` from the host as read-only. To use SSH keys:
 
 ```bash
 # Backup PostgreSQL
-sudo docker exec vps-dashboard-db pg_dump -U vpsadmin vpsdashboard > backup.sql
+sudo docker exec serversphere-db pg_dump -U vpsadmin vpsdashboard > backup.sql
 
 # Restore
-cat backup.sql | sudo docker exec -i vps-dashboard-db psql -U vpsadmin vpsdashboard
+cat backup.sql | sudo docker exec -i serversphere-db psql -U vpsadmin vpsdashboard
 ```

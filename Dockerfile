@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 
-LABEL maintainer="VPS Dashboard"
+LABEL maintainer="ServerSphere"
 LABEL description="Multi-VPS Management Dashboard"
 
 # Install system deps for SSH

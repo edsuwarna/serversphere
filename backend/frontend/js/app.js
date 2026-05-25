@@ -1,4 +1,4 @@
-/* ═══ VPS Dashboard - Application Logic ═══ */
+/* ═══ ServerSphere - Application Logic ═══ */
 
 // ─── State ──────────────────────────────────────────────────
 let currentVPSId = null;

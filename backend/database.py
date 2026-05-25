@@ -1,5 +1,5 @@
 """
-Database module - PostgreSQL via SQLAlchemy for VPS Dashboard.
+Database module - PostgreSQL via SQLAlchemy for ServerSphere.
 """
 import os
 import uuid

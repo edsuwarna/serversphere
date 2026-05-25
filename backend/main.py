@@ -35,7 +35,7 @@ from database import (
 )
 
 # ─── Config ──────────────────────────────────────────────────
-SESSION_SECRET = os.environ.get("SECRET_KEY", "vps-dashboard-secret")
+SESSION_SECRET = os.environ.get("SECRET_KEY", "change-this-to-a-random-secret")
 DASHBOARD_USER = os.environ.get("DASHBOARD_USER", "admin")
 DASHBOARD_PASS = os.environ.get("DASHBOARD_PASS", "change-me")
 
@@ -1224,7 +1224,7 @@ async def add_ssh_key(request: Request):
     effective_key_file = key_file
     if private_key and not key_file:
         import tempfile, os
-        key_dir = "/tmp/vps-dashboard-keys"
+        key_dir = "/tmp/serversphere-keys"
         os.makedirs(key_dir, exist_ok=True)
         safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in name)
         tmp_path = os.path.join(key_dir, f"{safe_name}_id_rsa")
