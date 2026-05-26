@@ -44,6 +44,7 @@ class VPS(Base):
     port = Column(Integer, default=22)
     username = Column(String(128), default="root")
     password = Column(Text, nullable=True)
+    # TODO: encrypt at rest
     key_file = Column(Text, nullable=True)
     tags = Column(Text, default="[]")  # JSON-encoded list
     group_name = Column("group", String(128), default="default")
@@ -83,6 +84,7 @@ class SSHKey(Base):
     name = Column(String(256), nullable=False)
     key_file = Column(Text, nullable=True)  # path to private key file on the dashboard host (optional if content pasted)
     private_key = Column(Text, nullable=True)  # pasted private key content (PEM format)
+    # TODO: encrypt at rest
     public_key = Column(Text, nullable=True)  # optional: store public key content for reference
     fingerprint = Column(String(128), nullable=True)  # ssh-keygen fingerprint
     key_type = Column(String(32), nullable=True)  # 'file', 'pasted', or 'both'
@@ -117,6 +119,7 @@ class GitHubToken(Base):
     id = Column(String(32), primary_key=True)
     name = Column(String(256), nullable=False)
     token = Column(Text, nullable=False)  # GitHub PAT (encrypted in future)
+    # TODO: encrypt at rest
     github_user = Column(String(128), nullable=True)  # GitHub username/org
     created_by = Column(String(32), ForeignKey("users.id"), nullable=True)
     created_at = Column(Float, default=time.time)

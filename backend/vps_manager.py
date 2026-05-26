@@ -70,7 +70,10 @@ class SSHConnectionPool:
                     del self._connections[key]
 
             client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.set_missing_host_key_policy(paramiko.WarningPolicy())
+            # SECURITY: AutoAddPolicy silently accepts unknown host keys, opening
+            # the door to MITM attacks. WarningPolicy logs a warning instead.
+            # For production, consider RejectPolicy + known_hosts verification.
 
             connect_kwargs = {
                 "hostname": vps.host,

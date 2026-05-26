@@ -38,7 +38,7 @@ Environment variables (set in `.env` or `docker-compose.yml`):
 
 | Variable | Default | Description |
 |---|---|---|
-| `DASHBOARD_USER` | `admin` | Initial admin username |
+| `DASHBOARD_USER` | `changeme` | Initial admin username |
 | `DASHBOARD_PASS` | `change-me` | Initial admin password |
 | `DASHBOARD_PORT` | `8080` | Port to expose |
 | `SECRET_KEY` | `change-this-...` | Session secret |

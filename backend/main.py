@@ -35,12 +35,14 @@ from database import (
 )
 
 # ─── Config ──────────────────────────────────────────────────
-SESSION_SECRET = os.environ.get("SECRET_KEY", "change-this-to-a-random-secret")
-DASHBOARD_USER = os.environ.get("DASHBOARD_USER", "admin")
-DASHBOARD_PASS = os.environ.get("DASHBOARD_PASS", "change-me")
+SESSION_SECRET = os.environ.get("SECRET_KEY", "change-me-to-random-secret")
+DASHBOARD_USER = os.environ.get("DASHBOARD_USER", "changeme")
+DASHBOARD_PASS = os.environ.get("DASHBOARD_PASS", "changeme")
 
 app = FastAPI(title="VPS Dashboard", version="2.1.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
+app.add_middleware(CORSMiddleware, allow_origins=[], allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
+# SECURITY: Restrict allow_origins to your deployment domain in production, e.g.:
+# allow_origins=["https://your-domain.com"],
 
 manager = VPSManager()
 
@@ -418,7 +420,7 @@ async def login(form: LoginForm, request: Request, response: JSONResponse):
                 "display_name": user_model.display_name,
             })
             max_age = 86400 * 7 if form.remember else 86400
-            resp.set_cookie("session", token, httponly=True, max_age=max_age, samesite="lax", secure=False)
+            resp.set_cookie("session", token, httponly=True, max_age=max_age, samesite="lax", secure=True)
             audit_log(request, "login", resource_type="system", details={"username": form.username})
             return resp
     finally:
