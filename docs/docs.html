@@ -34,12 +34,6 @@
         .sidebar-header .logo { font-size: 24px; line-height: 1; }
         .sidebar-header h2 { font-size: 15px; font-weight: 700; background: linear-gradient(135deg,var(--accent),var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
         .sidebar-header small { display: block; font-size: 11px; color: var(--text2); font-weight: 400; -webkit-text-fill-color: var(--text2); }
-        .lang-toggle { display: flex; gap: 0; padding: 8px 20px; border-bottom: 1px solid var(--border); }
-        .lang-btn { flex: 1; padding: 4px 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--bg2); color: var(--text2); transition: all 0.15s; text-align: center; font-family: inherit; }
-        .lang-btn:first-child { border-radius: 5px 0 0 5px; }
-        .lang-btn:last-child { border-radius: 0 5px 5px 0; }
-        .lang-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-        .lang-btn:not(.active):hover { background: var(--bg3); color: var(--text); }
         .sidebar-back { display: flex; align-items: center; gap: 6px; padding: 10px 20px; color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 500; border-bottom: 1px solid var(--border); transition: background 0.2s; }
         .sidebar-back:hover { background: var(--bg3); }
         .sidebar-nav { padding: 8px 0; }
@@ -119,10 +113,6 @@
                 <div class="logo">🌐</div>
                 <div><h2>ServerSphere</h2><small>Multi-Server Dashboard</small></div>
             </div>
-            <div class="lang-toggle">
-                <button class="lang-btn active" data-lang="en" onclick="switchLang('en')">🇬🇧 EN</button>
-                <button class="lang-btn" data-lang="id" onclick="switchLang('id')">🇮🇩 ID</button>
-            </div>
             <a href="index.html" class="sidebar-back">← Back to Home</a>
             <div class="sidebar-nav" id="navLinks">
                 <div class="sidebar-label" id="navLabel">Documentation</div>
@@ -147,38 +137,21 @@
     </div>
 
     <script>
-        const PAGES = {
-            en: [
-                { id: "overview", label: "📖 Overview" },
-                { id: "quickstart", label: "⚡ Quick Start" },
-                { id: "architecture", label: "🏗 Architecture" },
-                { id: "installation", label: "📦 Installation" },
-                { id: "configuration", label: "⚙️ Configuration" },
-                { id: "usage-guide", label: "🚀 Usage Guide" },
-                { id: "features", label: "✨ Features" },
-                { id: "api", label: "🔌 API Reference" },
-                { id: "database", label: "🗄 Database Schema" },
-                { id: "development", label: "🛠️ Development" },
-                { id: "security", label: "🔒 Security" },
-                { id: "troubleshooting", label: "🔍 Troubleshooting" },
-            ],
-            id: [
-                { id: "overview", label: "📖 Ikhtisar" },
-                { id: "quickstart", label: "⚡ Mulai Cepat" },
-                { id: "architecture", label: "🏗 Arsitektur" },
-                { id: "installation", label: "📦 Instalasi" },
-                { id: "configuration", label: "⚙️ Konfigurasi" },
-                { id: "usage-guide", label: "🚀 Panduan Penggunaan" },
-                { id: "features", label: "✨ Fitur" },
-                { id: "api", label: "🔌 Referensi API" },
-                { id: "database", label: "🗄 Skema Database" },
-                { id: "development", label: "🛠️ Pengembangan" },
-                { id: "security", label: "🔒 Keamanan" },
-                { id: "troubleshooting", label: "🔍 Pemecahan Masalah" },
-            ]
-        };
+        const PAGES = [
+            { id: "overview", label: "📖 Overview" },
+            { id: "quickstart", label: "⚡ Quick Start" },
+            { id: "architecture", label: "🏗 Architecture" },
+            { id: "installation", label: "📦 Installation" },
+            { id: "configuration", label: "⚙️ Configuration" },
+            { id: "usage-guide", label: "🚀 Usage Guide" },
+            { id: "features", label: "✨ Features" },
+            { id: "api", label: "🔌 API Reference" },
+            { id: "database", label: "🗄 Database Schema" },
+            { id: "development", label: "🛠️ Development" },
+            { id: "security", label: "🔒 Security" },
+            { id: "troubleshooting", label: "🔍 Troubleshooting" },
+        ];
 
-        let currentLang = "en";
         let currentPage = "overview";
         let tocObserver = null;
 
@@ -193,23 +166,14 @@
         const saved = localStorage.getItem('ss-docs-theme');
         if (saved) setTheme(saved);
 
-        function switchLang(lang) {
-            currentLang = lang;
-            document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
-            document.getElementById('navLabel').textContent = lang === 'en' ? 'Documentation' : 'Dokumentasi';
-            rebuildNav();
-            loadPage(currentPage);
-            history.replaceState(null, '', `?lang=${lang}&page=${currentPage}`);
-        }
-
         function rebuildNav() {
             const container = document.getElementById("navLinks");
             const label = container.querySelector(".sidebar-label");
             container.innerHTML = '';
             container.appendChild(label);
-            PAGES[currentLang].forEach(p => {
+            PAGES.forEach(p => {
                 const a = document.createElement("a");
-                a.href = `?lang=${currentLang}&page=${p.id}`;
+                a.href = `?page=${p.id}`;
                 a.textContent = p.label;
                 a.dataset.page = p.id;
                 if (p.id === currentPage) a.classList.add("active");
@@ -367,19 +331,17 @@
             currentPage = pageId;
             document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.toggle('active', a.dataset.page === pageId));
             const url = new URL(window.location);
-            url.searchParams.set('lang', currentLang);
-            url.searchParams.set('page', pageId);
+            url.search = `?page=${pageId}`;
             url.hash = '';
-            window.history.replaceState({lang: currentLang, page: pageId}, '', url);
-            const dir = currentLang === 'en' ? '.' : 'id';
+            window.history.replaceState({page: pageId}, '', url);
             const fileName = pageId === 'overview' ? 'README' : pageId;
-            document.getElementById('editOnGitHub').href = `https://github.com/edsuwarna/serversphere/blob/main/docs/${dir}/${fileName}.md`;
-            const page = PAGES[currentLang].find(p => p.id === pageId);
+            document.getElementById('editOnGitHub').href = `https://github.com/edsuwarna/serversphere/blob/main/docs/${fileName}.md`;
+            const page = PAGES.find(p => p.id === pageId);
             if (page) document.title = `${page.label.replace(/^[^\s]+\s/, '')} — ServerSphere`;
             const container = document.getElementById('docsContent');
             container.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading documentation...</p></div>';
             try {
-                const resp = await fetch(`${dir}/${fileName}.md`);
+                const resp = await fetch(`${fileName}.md`);
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const md = await resp.text();
                 const html = renderMarkdown(md);
@@ -389,15 +351,16 @@
                 setupRightTOCScroll(tocItems);
                 if (window.location.hash) setTimeout(() => document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ behavior: 'smooth' }), 150);
             } catch (err) {
-                container.innerHTML = `<div class="error-state"><div class="err-icon">⚠️</div><h2>${currentLang==='en'?'Page not available':'Halaman tidak tersedia'}</h2><p>${currentLang==='en'?'This page is being written. Check back soon!':'Halaman ini sedang ditulis. Nanti lagi ya!'}</p><p style="margin-top:16px;color:var(--text2);font-size:13px;">${err.message}</p></div>`;
+                container.innerHTML = `<div class="error-state"><div class="err-icon">⚠️</div><h2>Page not available</h2><p>This page is being written. Check back soon!</p><p style="margin-top:16px;color:var(--text2);font-size:13px;">${err.message}</p></div>`;
             }
         }
 
+        // Backward compat: old ?lang=id... → redirect to English
         const params = new URLSearchParams(window.location.search);
-        const initialLang = params.get('lang') === 'id' ? 'id' : 'en';
-        currentLang = initialLang;
-        document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === initialLang));
-        document.getElementById('navLabel').textContent = initialLang === 'en' ? 'Documentation' : 'Dokumentasi';
+        if (params.get('lang') === 'id') {
+            const page = params.get('page') || 'overview';
+            window.history.replaceState(null, '', `?page=${page}`);
+        }
         rebuildNav();
         const initialPage = params.get('page') || 'overview';
         loadPage(initialPage);
