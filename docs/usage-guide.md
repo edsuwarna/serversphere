@@ -1,23 +1,27 @@
 # Usage Guide
 
 ## Dashboard
-Setelah login, lu liat semua server dalam bentuk cards — status (hijau/merah), IP, CPU, RAM, Disk.
+
+After login, you'll see all your servers displayed as cards — status (green/red), IP, CPU, RAM, Disk at a glance.
 
 ## SSH Terminal
-Klik icon terminal di card server. Terminal full beneran — bisa `apt update`, `top`, `vim`, apa aja.
-- Buka banyak tab buat server beda
-- Copy-paste pake Ctrl+Shift+C / Ctrl+Shift+V
-- Ukuran terminal bisa diresize
+
+Click the terminal icon on any server card. It's a real terminal — you can run `apt update`, `top`, `vim`, anything.
+- Open multiple tabs for different servers
+- Copy-paste with Ctrl+Shift+C / Ctrl+Shift+V
+- Terminal window is resizable
 
 ## Container Management
-Buka tab Containers di dashboard:
-- **List** — liat semua container (name, image, status, ports)
-- **Start/Stop/Restart/Remove** — dari tombol aja
-- **Logs** — liat real-time logs per container
-- **Stats** — CPU & Memory per container
+
+Open the **Containers** tab in the dashboard:
+- **List** — view all containers (name, image, status, ports)
+- **Start/Stop/Restart/Remove** — one-click buttons
+- **Logs** — view real-time logs per container
+- **Stats** — CPU & Memory usage per container
 
 ## System Logs
-Tab Logs → pilih jenis log:
+
+**Logs** tab → select log type:
 - Syslog — `/var/log/syslog`
 - Auth — `/var/log/auth.log`
 - Kernel — `dmesg`
@@ -25,24 +29,27 @@ Tab Logs → pilih jenis log:
 - Nginx — `/var/log/nginx/*.log`
 
 ## Resource Monitoring
-Setiap server card nunjukkin:
-- **CPU** — progress bar + persentase
+
+Each server card shows:
+- **CPU** — progress bar + percentage
 - **RAM** — used / total
-- **Disk** — pemakaian partition root
-- **Load Average** — 1, 5, 15 menit
+- **Disk** — root partition usage
+- **Load Average** — 1, 5, 15 minutes
 
 ## User Management
-Admin bisa:
-1. **Buat user** — nama, password, role
-2. **Assign VPS** — pilih server mana yang bisa diakses
-3. **Edit role** — naikin/turunin level
-4. **Hapus user** — cabut akses
+
+Admins can:
+1. **Create users** — set name, password, role
+2. **Assign VPS** — choose which servers the user can access
+3. **Edit roles** — promote/demote users (Admin / Operator / Viewer)
+4. **Delete users** — revoke access entirely
 
 ## Quick Commands
-Tombol preset di halaman VPS detail:
-- `df -h` — cek disk
-- `free -h` — cek RAM
-- `uptime` — uptime server
-- `docker ps` — container list
 
-Klik tinggal jalan, gak perlu ngetik manual.
+Preset buttons on the VPS detail page:
+- `df -h` — check disk usage
+- `free -h` — check RAM
+- `uptime` — server uptime
+- `docker ps` — list containers
+
+Just click to run — no need to type manually.

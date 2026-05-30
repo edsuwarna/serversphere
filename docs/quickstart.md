@@ -1,10 +1,10 @@
 # Quick Start
 
-Butuh Docker & Docker Compose di server. Jalanin 2 menit.
+You need Docker & Docker Compose on your server. Takes about 2 minutes.
 
-## 1. Download & Jalanin
+## 1. Download & Run
 
-Buat `docker-compose.yml`, isi dari [Installation](/installation) — atau clone repo:
+Create a `docker-compose.yml` (see [Installation](docs.html?page=installation)) or clone the repo:
 
 ```bash
 git clone https://github.com/edsuwarna/serversphere.git
@@ -14,25 +14,18 @@ docker compose up -d
 
 ## 2. Login
 
-Buka `http://server-ip:8080`
+Open `http://server-ip:8080`
 - Username: `admin`
 - Password: `change-me`
 
-## 3. Tambah VPS
+## 3. Add a VPS
 
-- Klik **Add VPS**
-- Isi IP/hostname, SSH user, dan pilih SSH key
-- Kalo sukses, server muncul di daftar dengan status hijau
+- Click **Add VPS**
+- Enter the IP/hostname, SSH user, and select an SSH key
+- If successful, the server appears in the list with a green status indicator
 
-## 4. Coba Fitur
+## 4. Try the Features
 
-- Klik icon terminal buat SSH langsung dari browser
-- Tab **Containers** buat liat/start/stop container di VPS
-- **Logs** buat liat syslog, auth, docker, nginx
-- **Users** buat nambah tim dengan akses terbatas
-
-## Default Credentials
-
-Username: `admin` / Password: `change-me`
-
-**Ganti password pas pertama login.** Jangan pake di production.
+- Click the terminal icon to SSH directly from your browser
+- Open the **Containers** tab to view/start/stop containers on your VPS
+- Check **Usage Guide** for detailed walkthroughs

@@ -1,10 +1,10 @@
 # Installation
 
-Ada dua cara: pake image dari GHCR (gak perlu clone repo) atau build sendiri.
+There are two ways to run ServerSphere: use the pre-built Docker image from GHCR (recommended) or build it yourself.
 
-## Pakai Docker Image (Recommended)
+## Using Docker Image (Recommended)
 
-Buat file `docker-compose.yml` di server lu:
+Create a `docker-compose.yml` on your server:
 
 ```yaml
 services:
@@ -52,36 +52,36 @@ volumes:
   serversphere-data:
 ```
 
-Jalankan:
+Run it:
 
 ```bash
 docker compose up -d
 ```
 
-Buka `http://server-ip:8080`, login `admin` / `change-me`.
+Open `http://server-ip:8080`, login with `admin` / `change-me`.
 
-## Clone & Build Sendiri
+## Clone & Build
 
-Kalo mau ngoprek kode atau butuh custom build:
+If you want to customize the code or need a custom build:
 
 ```bash
 git clone https://github.com/edsuwarna/serversphere.git
 cd serversphere
 
 cp .env.example .env
-# edit .env kalo perlu
+# edit .env if needed
 
 docker compose up -d --build
 ```
 
 ## Environment Variables
 
-| Variable | Default | Wajib? |
-|----------|---------|--------|
+| Variable | Default | Required |
+|----------|---------|----------|
 | `DASHBOARD_USER` | `admin` | optional |
-| `DASHBOARD_PASS` | `change-me` | wajib diganti |
-| `SECRET_KEY` | auto-generate | wajib diganti |
-| `POSTGRES_PASSWORD` | `change-me` | wajib diganti |
+| `DASHBOARD_PASS` | `change-me` | **must change** |
+| `SECRET_KEY` | auto-generated | **must change** |
+| `POSTGRES_PASSWORD` | `change-me` | **must change** |
 | `DASHBOARD_PORT` | `8080` | optional |
 | `POSTGRES_DB` | `vpsdashboard` | optional |
 | `POSTGRES_USER` | `vpsadmin` | optional |
@@ -90,10 +90,10 @@ docker compose up -d --build
 
 ## SSH Key Setup
 
-Volume `~/.ssh:/root/.ssh:ro` di docker-compose mount keys dari host. Pas add VPS, isi **SSH Key File Path** dengan path di container, misal `/root/.ssh/id_ed25519`.
+The volume `~/.ssh:/root/.ssh:ro` in docker-compose mounts your host SSH keys into the container. When adding a VPS, enter the **SSH Key File Path** as it appears inside the container, e.g., `/root/.ssh/id_ed25519`.
 
-## Yang Perlu Diingat
+## Important Notes
 
-- **Ganti password** default abis pertama login
-- Jangan expose port 8080 langsung ke publik — reverse proxy pake Nginx/Caddy + Cloudflare Tunnel lebih aman
-- Data PostgreSQL disimpan di volume `pg-data`, backup pake `pg_dump`
+- **Change the default password** immediately after first login
+- Don't expose port 8080 directly to the public — use a reverse proxy (Nginx/Caddy) or Cloudflare Tunnel for better security
+- PostgreSQL data is stored in the `pg-data` volume — back it up using `pg_dump`

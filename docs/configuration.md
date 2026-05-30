@@ -2,44 +2,44 @@
 
 ## Environment Variables
 
-Buat file `.env` di samping `docker-compose.yml`:
+Create a `.env` file next to your `docker-compose.yml`:
 
 ```env
 # Admin login
 DASHBOARD_USER=admin
-DASHBOARD_PASS=ganti-ini
+DASHBOARD_PASS=change-this
 
 # Web server
 DASHBOARD_PORT=8080
-SECRET_KEY=pake-string-random-yang-panjang
+SECRET_KEY=use-a-long-random-string
 
 # PostgreSQL
 POSTGRES_DB=vpsdashboard
 POSTGRES_USER=vpsadmin
-POSTGRES_PASSWORD=ganti-ini-juga
+POSTGRES_PASSWORD=change-this-too
 POSTGRES_HOST=serversphere-db
 POSTGRES_PORT=5432
 ```
 
-Kalo gak pake `.env`, bisa langsung di `environment:` di docker-compose.
+If you prefer not to use `.env`, you can set these directly under `environment:` in your `docker-compose.yml`.
 
 ## Add VPS
 
-Dari dashboard: **Add VPS** → isi:
+From the dashboard: click **Add VPS** → fill in:
 
-| Field | Contoh | Wajib? |
-|-------|--------|--------|
+| Field | Example | Required |
+|-------|---------|----------|
 | Name | web-prod-01 | optional |
-| Host | 192.168.1.100 atau server.example.com | wajib |
+| Host | 192.168.1.100 or server.example.com | required |
 | SSH Port | 22 | optional |
-| SSH User | root | wajib |
-| SSH Key Path | /root/.ssh/id_ed25519 | wajib |
+| SSH User | root | required |
+| SSH Key Path | /root/.ssh/id_ed25519 | required |
 
-SSH key harus ada di host dan termount ke container (lihat `volumes` di docker-compose).
+The SSH key must exist on the host and be mounted into the container (see `volumes` in `docker-compose.yml`).
 
 ## OIDC / SSO
 
-ServerSphere supports **OpenID Connect** for single sign-on. Setup:
+ServerSphere supports **OpenID Connect** for single sign-on. Quick setup:
 
 ```env
 OIDC_ENABLED=true
@@ -59,4 +59,4 @@ OIDC_CLIENT_SECRET=your-client-secret
 | **operator** | ✅ Assigned | ❌ | ✅ | ✅ | ❌ |
 | **viewer** | ✅ Assigned | ❌ | ❌ | ❌ | ❌ |
 
-Kalo VPS access kosong, user bisa akses semua server.
+If VPS access is empty, the user can access all servers.
