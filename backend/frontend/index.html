@@ -198,22 +198,55 @@
                         </button>
                     </div>
                     <div class="table-wrapper">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Status</th>
-                                    <th>Name</th>
-                                    <th>Host</th>
-                                    <th>User</th>
-                                    <th>Group</th>
-                                    <th>Tags</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="vpsTableBody">
-                            </tbody>
-                        </table>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width:36px;"><input type="checkbox" id="selectAllVPS" onchange="toggleSelectAllVPS(this)" title="Select all"></th>
+                                <th>Status</th>
+                                <th>Name</th>
+                                <th>Host</th>
+                                <th>User</th>
+                                <th>Group</th>
+                                <th>Tags</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vpsTableBody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- ═══ Bulk Action Bar ═══ -->
+                <div id="bulkActionBar" class="bulk-action-bar hidden">
+                    <div class="bulk-bar-inner">
+                        <span id="selectedCount" class="bulk-count">0 selected</span>
+                        <div class="bulk-actions">
+                            <button class="btn btn-primary btn-sm" onclick="showBulkCommandModal()">
+                                <span class="material-icons" style="font-size:16px">terminal</span> Run Command
+                            </button>
+                            <div class="bulk-quick-actions">
+                                <button class="btn btn-sm" onclick="bulkQuickAction('ping -c 3 google.com')" title="Ping test">
+                                    📡 Ping
+                                </button>
+                                <button class="btn btn-sm" onclick="bulkQuickAction('uptime')" title="System uptime">
+                                    ⏱ Uptime
+                                </button>
+                                <button class="btn btn-sm" onclick='bulkQuickAction("docker ps --format \"table {{.Names}}\t{{.Status}}\t{{.Image}}\"')' title="Docker containers">
+                                    🐳 Docker PS
+                                </button>
+                                <button class="btn btn-sm" onclick="bulkQuickAction('df -h /')" title="Disk usage">
+                                    💾 Disk
+                                </button>
+                                <button class="btn btn-sm" onclick="bulkQuickAction('free -h')" title="Memory usage">
+                                    🧠 Memory
+                                </button>
+                            </div>
+                            <button class="btn btn-ghost btn-sm" onclick="clearSelection()">
+                                <span class="material-icons" style="font-size:16px">close</span> Clear
+                            </button>
+                        </div>
                     </div>
+                </div>
                 </div>
 
                 <!-- ═══ Users Page (Admin Only) ═══ -->
@@ -272,6 +305,7 @@
                             <option value="user_delete">User Delete</option>
                             <option value="exec_command">Exec Command</option>
                             <option value="terminal_connect">Terminal Connect</option>
+                            <option value="bulk_command">Bulk Command</option>
                             <option value="sshkey_create">SSH Key Create</option>
                             <option value="sshkey_delete">SSH Key Delete</option>
                             <option value="group_create">Group Create</option>
@@ -1323,6 +1357,66 @@
                 <button type="button" class="btn btn-primary" onclick="saveEditRepo()">
                     <span class="material-icons" style="font-size:16px;">save</span> Save
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Bulk Command Modal ═══ -->
+    <div id="bulkCmdModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeBulkCmdModal()"></div>
+        <div class="modal-card" style="max-width:600px;">
+            <div class="modal-header">
+                <h3>Run Command on <span id="bulkCmdCount">0</span> VPS</h3>
+                <button class="modal-close" onclick="closeBulkCmdModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div style="padding:16px 24px;">
+                <div class="form-group">
+                    <label>Command *</label>
+                    <textarea id="bulkCmdInput" rows="4" placeholder="e.g. docker ps --format 'table {{.Names}}  {{.Status}}  {{.Image}}'"
+                        style="width:100%;padding:10px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;resize:vertical;"
+                        onkeydown="if(event.key==='Enter'&&event.ctrlKey)executeBulkCommand()"></textarea>
+                    <small style="color:var(--text-muted);font-size:11px;margin-top:4px;display:block;">Ctrl+Enter to run</small>
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label>Timeout</label>
+                    <select id="bulkCmdTimeout" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px;">
+                        <option value="10">10 seconds</option>
+                        <option value="30" selected>30 seconds</option>
+                        <option value="60">60 seconds</option>
+                        <option value="120">120 seconds</option>
+                    </select>
+                </div>
+                <div id="bulkVpsList" style="margin-top:12px;padding:8px 10px;background:var(--bg-elevated);border-radius:6px;font-size:12px;color:var(--text-secondary);max-height:100px;overflow-y:auto;font-family:var(--mono);"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeBulkCmdModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" id="bulkCmdRunBtn" onclick="executeBulkCommand()">
+                    <span class="material-icons" style="font-size:16px">play_arrow</span> Run
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Bulk Results Modal ═══ -->
+    <div id="bulkResultsModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeBulkResultsModal()"></div>
+        <div class="modal-card modal-lg" style="max-width:800px;">
+            <div class="modal-header">
+                <h3>Bulk Results</h3>
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <span id="bulkResultsSummary" style="font-size:13px;"></span>
+                    <button class="modal-close" onclick="closeBulkResultsModal()">
+                        <span class="material-icons">close</span>
+                    </button>
+                </div>
+            </div>
+            <div id="bulkResultsBody" style="padding:8px 16px;max-height:460px;overflow-y:auto;">
+            </div>
+            <div class="modal-footer" style="justify-content:space-between;">
+                <span id="bulkResultsTime" style="font-size:12px;color:var(--text-muted);"></span>
+                <button type="button" class="btn btn-secondary" onclick="closeBulkResultsModal()">Close</button>
             </div>
         </div>
     </div>

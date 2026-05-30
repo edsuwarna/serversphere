@@ -233,7 +233,10 @@ function showPage(page) {
         }
     }
     if (page === 'dashboard') refreshDashboard();
-    if (page === 'vps-list') loadVPSList();
+    if (page === 'vps-list') {
+        clearSelection();
+        loadVPSList();
+    }
     if (page === 'users') loadUsersList();
     if (page === 'audit') loadAuditLogs();
     if (page === 'ssh-keys') loadSSHKeys();
@@ -374,10 +377,11 @@ async function loadVPSList() {
 
         const tbody = document.getElementById('vpsTableBody');
         if (vpsList.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">No VPS available.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">No VPS available.</td></tr>';
             return;
         }
         tbody.innerHTML = vpsList.map(v => `<tr>
+            <td><input type="checkbox" class="vps-checkbox" value="${v.id}" ${selectedVPSIds.has(v.id) ? 'checked' : ''} onchange="updateBulkActionBar()"></td>
             <td><span class="status-dot ${v.online ? 'online' : 'offline'}"></span></td>
             <td><strong>${esc(v.name)}</strong></td>
             <td><code>${esc(v.host)}:${v.port}</code></td>
@@ -392,6 +396,198 @@ async function loadVPSList() {
         </tr>`).join('');
     } catch (err) {
         console.error('VPS list error:', err);
+    }
+}
+
+// ─── Bulk Operations ─────────────────────────────────────────
+let selectedVPSIds = new Set();
+let bulkResultsCache = [];
+
+function toggleSelectAllVPS(el) {
+    const checkboxes = document.querySelectorAll('.vps-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = el.checked;
+        if (el.checked) {
+            selectedVPSIds.add(cb.value);
+        } else {
+            selectedVPSIds.delete(cb.value);
+        }
+    });
+    updateBulkActionBar();
+}
+
+function updateBulkActionBar() {
+    // Re-sync from DOM checkboxes
+    selectedVPSIds.clear();
+    document.querySelectorAll('.vps-checkbox:checked').forEach(cb => {
+        selectedVPSIds.add(cb.value);
+    });
+
+    const bar = document.getElementById('bulkActionBar');
+    const count = document.getElementById('selectedCount');
+    const n = selectedVPSIds.size;
+
+    if (n > 0) {
+        bar.classList.remove('hidden');
+        count.textContent = `${n} selected`;
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+function clearSelection() {
+    selectedVPSIds.clear();
+    document.querySelectorAll('.vps-checkbox').forEach(cb => cb.checked = false);
+    const selectAll = document.getElementById('selectAllVPS');
+    if (selectAll) selectAll.checked = false;
+    updateBulkActionBar();
+}
+
+function showBulkCommandModal() {
+    const n = selectedVPSIds.size;
+    if (n === 0) {
+        showToast('No VPS selected', 'warning');
+        return;
+    }
+    document.getElementById('bulkCmdCount').textContent = n;
+    document.getElementById('bulkCmdInput').value = '';
+    document.getElementById('bulkCmdTimeout').value = '30';
+
+    // Show selected VPS names
+    const names = [];
+    document.querySelectorAll('.vps-checkbox:checked').forEach(cb => {
+        const row = cb.closest('tr');
+        if (row) {
+            const nameEl = row.querySelector('strong');
+            if (nameEl) names.push(nameEl.textContent);
+        }
+    });
+    document.getElementById('bulkVpsList').textContent = names.join(', ') || `${n} VPS selected`;
+
+    document.getElementById('bulkCmdModal').classList.remove('hidden');
+    document.getElementById('bulkCmdInput').focus();
+}
+
+function closeBulkCmdModal() {
+    document.getElementById('bulkCmdModal').classList.add('hidden');
+}
+
+function closeBulkResultsModal() {
+    document.getElementById('bulkResultsModal').classList.add('hidden');
+}
+
+async function executeBulkCommand() {
+    const cmd = document.getElementById('bulkCmdInput').value.trim();
+    const timeout = parseInt(document.getElementById('bulkCmdTimeout').value) || 30;
+    const vpsIds = Array.from(selectedVPSIds);
+
+    if (!cmd) {
+        showToast('Please enter a command', 'warning');
+        return;
+    }
+
+    // Lock button
+    const btn = document.getElementById('bulkCmdRunBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons" style="font-size:16px">hourglass_top</span> Running...';
+
+    try {
+        const res = await api('POST', '/vps/bulk/command', {
+            vps_ids: vpsIds,
+            command: cmd,
+            timeout: timeout,
+        });
+
+        bulkResultsCache = res.results || [];
+        closeBulkCmdModal();
+        showBulkResults(res);
+    } catch (err) {
+        showToast('Bulk command failed: ' + err.message, 'danger');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-icons" style="font-size:16px">play_arrow</span> Run';
+    }
+}
+
+function bulkQuickAction(command) {
+    const n = selectedVPSIds.size;
+    if (n === 0) {
+        showToast('No VPS selected', 'warning');
+        return;
+    }
+    document.getElementById('bulkCmdCount').textContent = n;
+    document.getElementById('bulkCmdInput').value = command;
+    document.getElementById('bulkCmdTimeout').value = '30';
+
+    const names = [];
+    document.querySelectorAll('.vps-checkbox:checked').forEach(cb => {
+        const row = cb.closest('tr');
+        if (row) {
+            const nameEl = row.querySelector('strong');
+            if (nameEl) names.push(nameEl.textContent);
+        }
+    });
+    document.getElementById('bulkVpsList').textContent = names.join(', ') || `${n} VPS selected`;
+
+    document.getElementById('bulkCmdModal').classList.remove('hidden');
+    document.getElementById('bulkCmdInput').focus();
+}
+
+function showBulkResults(data) {
+    const { summary, results } = data;
+    const body = document.getElementById('bulkResultsBody');
+    const summaryEl = document.getElementById('bulkResultsSummary');
+    const timeEl = document.getElementById('bulkResultsTime');
+
+    // Summary badge
+    const successPct = summary.total > 0 ? Math.round(summary.success / summary.total * 100) : 0;
+    let summaryColor = 'var(--success)';
+    if (summary.failed > 0) summaryColor = summary.failed === summary.total ? 'var(--danger)' : 'var(--warning)';
+
+    summaryEl.innerHTML = `
+        <span style="font-weight:600;color:${summaryColor}">
+            ${summary.success}/${summary.total} succeeded (${successPct}%)
+        </span>
+        <span style="color:var(--text-muted);font-size:12px;margin-left:8px;">
+            ${summary.failed > 0 ? `🔴 ${summary.failed} failed` : '✅ all passed'}
+        </span>
+    `;
+
+    timeEl.textContent = `Total: ${(summary.total_time_ms / 1000).toFixed(1)}s · ${results.length} VPS`;
+
+    // Render results
+    body.innerHTML = results.map(r => {
+        const isSuccess = r.success;
+        const statusIcon = isSuccess ? '✅' : '❌';
+        const statusClass = isSuccess ? 'success' : 'fail';
+        const escapedOutput = esc(r.output || '');
+        const escapedError = esc(r.error || '');
+        const hasOutput = r.output || r.error;
+
+        return `
+        <div class="bulk-result-item ${statusClass}">
+            <div class="bulk-result-header" onclick="toggleBulkResultOutput(this)">
+                <span>${statusIcon}</span>
+                <span class="bulk-result-name">${esc(r.vps_name || r.vps_id)}</span>
+                <span class="bulk-result-time">${r.exec_time_ms}ms</span>
+                <span class="bulk-result-status" style="color:${isSuccess ? 'var(--success)' : 'var(--danger)'}">
+                    ${isSuccess ? 'OK' : 'FAIL'}
+                </span>
+                <span class="material-icons" style="font-size:18px;color:var(--text-muted)">expand_more</span>
+            </div>
+            <div class="bulk-result-output">${hasOutput ? (escapedOutput || escapedError) : '<span style="color:var(--text-muted)">(no output)</span>'}</div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('bulkResultsModal').classList.remove('hidden');
+}
+
+function toggleBulkResultOutput(header) {
+    const output = header.nextElementSibling;
+    if (output) {
+        output.classList.toggle('open');
+        const icon = header.querySelector('.material-icons');
+        if (icon) icon.textContent = output.classList.contains('open') ? 'expand_less' : 'expand_more';
     }
 }
 

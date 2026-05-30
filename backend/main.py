@@ -194,6 +194,31 @@ def audit_log(request, action, resource_type=None, resource_id=None, details=Non
         db.close()
 
 
+# ─── Bulk Operation Helpers ───────────────────────────────────
+
+async def _run_on_vps(vps_id: str, command: str, timeout: int, user: dict) -> dict:
+    """Run a command on a single VPS (for parallel bulk execution)."""
+    import time as _time
+    start = _time.time()
+    try:
+        vps_config = get_vps_and_check_access(vps_id, user)
+        result = await manager.ssh_pool.execute_async(vps_config, command, timeout)
+        elapsed_ms = int((_time.time() - start) * 1000)
+        return {
+            "vps_id": vps_id,
+            "vps_name": vps_config.name,
+            "success": result["success"],
+            "output": result.get("stdout", ""),
+            "error": result.get("stderr", ""),
+            "exit_code": result.get("exit_code", -1),
+            "exec_time_ms": elapsed_ms,
+        }
+    except HTTPException as e:
+        return {"vps_id": vps_id, "success": False, "error": str(e.detail), "exec_time_ms": int((_time.time() - start) * 1000)}
+    except Exception as e:
+        return {"vps_id": vps_id, "success": False, "error": str(e)[:300], "exec_time_ms": int((_time.time() - start) * 1000)}
+
+
 # ─── Startup ─────────────────────────────────────────────────
 
 @app.on_event("startup")
@@ -968,6 +993,47 @@ async def vps_batch_status(request: Request):
             status = await loop.run_in_executor(None, manager.test_connection, vps)
             results[vid] = status.get("connected", False)
     return results
+
+
+# ─── Bulk Operations: Run commands on multiple VPS ────────────
+
+@app.post("/api/vps/bulk/command")
+async def bulk_command(request: Request):
+    """Run command on multiple VPS in parallel. operator+admin only.
+    Body: {"vps_ids": ["id1","id2"], "command": "uptime", "timeout": 30}
+    Returns per-VPS results with exec_time_ms."""
+    user = get_current_user(request)
+    if user["role"] not in ("admin", "operator"):
+        raise HTTPException(status_code=403, detail="Bulk commands require operator+ role")
+
+    body = await request.json()
+    vps_ids = body.get("vps_ids", [])
+    command = body.get("command", "")
+    timeout = min(body.get("timeout", 30), 120)
+
+    if not vps_ids:
+        raise HTTPException(status_code=400, detail="No VPS IDs provided")
+    if not command.strip():
+        raise HTTPException(status_code=400, detail="Command is required")
+
+    results = await asyncio.gather(*[_run_on_vps(vid, command, timeout, user) for vid in vps_ids])
+
+    audit_log(request, "bulk_command", resource_type="vps",
+              resource_id=",".join(vps_ids[:5]),
+              details={"count": len(vps_ids), "cmd": command[:100]})
+
+    success_count = sum(1 for r in results if r["success"])
+    total_time = sum(r.get("exec_time_ms", 0) for r in results)
+
+    return {
+        "results": results,
+        "summary": {
+            "total": len(results),
+            "success": success_count,
+            "failed": len(results) - success_count,
+            "total_time_ms": total_time,
+        }
+    }
 
 
 # ═══════════════════════════════════════════════════════════════

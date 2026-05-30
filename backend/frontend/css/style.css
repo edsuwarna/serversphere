@@ -143,6 +143,7 @@ a { color: inherit; text-decoration: none; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 /* ════ App Layout ════ */
+#app:not(.hidden),
 .app-layout {
   display: flex;
   height: 100vh;
@@ -311,7 +312,7 @@ a { color: inherit; text-decoration: none; }
   font-size: 10px;
   font-weight: 700;
   background: var(--amber-500);
-  color: #fff;
+  color: var(--amber-900);
   padding: 2px 7px;
   border-radius: var(--radius-full);
   margin-left: auto;
@@ -632,11 +633,13 @@ a { color: inherit; text-decoration: none; }
 .btn-primary {
   background: var(--amber-500);
   border-color: var(--amber-500);
-  color: #fff;
+  color: var(--amber-900);
+  font-weight: 600;
 }
 .btn-primary:hover {
-  background: var(--amber-600);
-  border-color: var(--amber-600);
+  background: var(--amber-400);
+  border-color: var(--amber-400);
+  color: var(--amber-900);
 }
 
 .btn-secondary {
@@ -885,6 +888,158 @@ a { color: inherit; text-decoration: none; }
 
 .data-table tr:hover td {
   background: var(--bg-card-hover);
+}
+
+/* ════ Bulk Actions ════ */
+.bulk-action-bar {
+  margin-top: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--amber-500);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.bulk-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.bulk-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--amber-700);
+  white-space: nowrap;
+  padding: 4px 10px;
+  background: rgba(245, 158, 11, 0.1);
+  border-radius: var(--radius-full);
+}
+
+[data-theme="dark"] .bulk-count {
+  color: var(--amber-400);
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.bulk-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 0 4px;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 12px;
+  gap: 4px;
+}
+
+.btn-group {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+}
+
+.btn-ghost:hover {
+  color: var(--text-secondary);
+  background: var(--bg-card-hover);
+}
+
+/* Bulk result items */
+.bulk-result-item {
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.bulk-result-item.success {
+  border-left: 3px solid var(--success);
+}
+
+.bulk-result-item.fail {
+  border-left: 3px solid var(--danger);
+}
+
+.bulk-result-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  cursor: pointer;
+  user-select: none;
+}
+
+.bulk-result-header:hover {
+  background: var(--bg-card-hover);
+}
+
+.bulk-result-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.bulk-result-status {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.bulk-result-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+
+.bulk-result-output {
+  padding: 8px 12px;
+  background: var(--bg-input);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text);
+  max-height: 200px;
+  overflow-y: auto;
+  display: none;
+}
+
+.bulk-result-output.open {
+  display: block;
+}
+
+/* Checkbox in table */
+.data-table th input[type="checkbox"],
+.data-table td input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--amber-500);
 }
 
 /* ════ Forms ════ */
