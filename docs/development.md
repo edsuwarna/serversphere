@@ -1,10 +1,9 @@
-# 🛠️ Development
+# Development
 
 ## Prerequisites
-
 - Python 3.9+
 - PostgreSQL 16+
-- Docker (optional, for testing)
+- Docker (optional)
 
 ## Local Setup
 
@@ -12,10 +11,7 @@
 git clone https://github.com/edsuwarna/serversphere.git
 cd serversphere
 
-# Install dependencies
-pip install fastapi uvicorn sqlalchemy paramiko psycopg2-binary
-
-# Setup PostgreSQL
+pip install -r backend/requirements.txt
 createdb vpsdashboard
 ```
 
@@ -24,41 +20,38 @@ createdb vpsdashboard
 ```
 serversphere/
 ├── backend/
-│   ├── main.py           ← FastAPI app (routes, WebSocket)
-│   ├── database.py       ← DB connection & session
-│   ├── models.py         ← SQLAlchemy models
+│   ├── main.py              # FastAPI routes + WebSocket
+│   ├── database.py          # SQLAlchemy connection
+│   ├── vps_manager.py       # SSH logic via Paramiko
 │   ├── frontend/
-│   │   ├── index.html    ← SPA dashboard
-│   │   ├── css/style.css ← Styles
-│   │   └── js/app.js     ← Client logic
-│   └── requirements.txt  ← Python dependencies
-├── docker-compose.yml    ← Production setup
-├── Dockerfile            ← App container
-├── .env.example          ← Config template
-└── docs/                 ← Documentation
+│   │   ├── index.html       # SPA dashboard
+│   │   ├── css/style.css    # Styles (Amber theme)
+│   │   └── js/app.js        # Client logic
+│   └── requirements.txt
+├── docker-compose.yml
+├── Dockerfile
+├── .env.example
+└── docs/
 ```
 
-## Running Locally
+## Run Locally
 
 ```bash
 cd backend
-# Ensure PostgreSQL is running with correct credentials in .env
+cp ../.env.example ../.env
+# edit .env, pastiin PostgreSQL jalan
+
 uvicorn main:app --reload --host 0.0.0.0 --port 8080
 ```
 
-## Key Dependencies
+## Dependencies Kunci
 
-- **FastAPI** — Web framework with async support
-- **SQLAlchemy** — ORM for database operations
-- **Paramiko** — SSH client for remote server access
+- **FastAPI** — Web framework + async
+- **SQLAlchemy** — ORM
+- **Paramiko** — SSH client
 - **xterm.js** — Terminal emulator (frontend)
+- **psycopg2-binary** — PostgreSQL driver
 
 ## Testing
 
-```bash
-# Manual: Start server, open browser, test features
-# 1. Add a VPS
-# 2. Open terminal
-# 3. View containers
-# 4. Create user with restricted access
-```
+Manual test: jalanin server → buka browser → tes fitur (add VPS, terminal, containers, RBAC).

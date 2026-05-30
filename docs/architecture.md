@@ -1,63 +1,45 @@
-# 🏗 Architecture
-
-## System Overview
+# Architecture
 
 ```
 Browser (SPA)  ←→  FastAPI (Python)  ←→  PostgreSQL
-                     ├── REST API (VPS CRUD, users, RBAC)
-                     └── WebSocket (SSH terminal)
-                             └── Paramiko (SSH)
+                     ├── REST API
+                     └── WebSocket (SSH)
+                             └── Paramiko (SSH client)
 ```
 
-## Components
+## Backend
 
-### Frontend (Single Page App)
+FastAPI app di `backend/main.py` nyediain:
+- **REST API** — CRUD VPS, users, auth, audit logs
+- **WebSocket** — SSH terminal session (tiap client dapet session sendiri)
+- **Middleware** — auth session, CORS, logging
 
-- **Vanilla JavaScript** — no framework overhead
-- **xterm.js** — full terminal emulator in the browser
-- **Material Icons** — UI icon set
-- **Dark theme** — easy on the eyes for ops work
+## Database
 
-The frontend is a single `index.html` with embedded CSS/JS, served by FastAPI.
+PostgreSQL pake SQLAlchemy ORM. Tabel:
 
-### Backend (FastAPI)
+| Table | Isi |
+|-------|-----|
+| `users` | User accounts (hashed password, role) |
+| `vps` | VPS configs (host, port, user, key path) |
+| `user_vps_access` | Junction — per-user VPS access |
+| `audit_logs` | Semua aktivitas user |
 
-- **REST API** — CRUD for VPS, users, RBAC assignments
-- **WebSocket** — real-time SSH terminal sessions
-- **SQLAlchemy ORM** — database access and migrations
-- **Paramiko** — SSH client for connecting to remote VPS
+## Frontend
 
-### Database (PostgreSQL)
+Single-page app pake vanilla JS. File statis diserve langsung dari FastAPI (`/frontend/`).
 
-Key tables:
-- `users` — User accounts with hashed passwords and roles
-- `vps` — VPS server configurations (host, port, user, key path)
-- `user_vps_access` — Junction table for per-user VPS access
+Komunikasi:
+- REST → fetch API buat CRUD
+- WebSocket → xterm.js buat SSH terminal
+- Session → cookie-based (httponly)
 
-### SSH Connection Flow
+## Container
 
-```
-Browser → WebSocket → FastAPI → Paramiko → Remote VPS SSH
-                ↓
-        Terminal I/O (stdin/stdout)
-```
+Dua container:
+- **serversphere** — Python FastAPI + frontend (port 8080)
+- **serversphere-db** — PostgreSQL 18
 
-1. User opens terminal from browser
-2. WebSocket connects to FastAPI backend
-3. Backend opens Paramiko SSH connection to the target VPS
-4. Terminal I/O streams between browser ↔ server ↔ remote VPS
-
-## Deployment Architecture
-
-```
-┌─────────────┐     ┌──────────────────┐     ┌──────────────┐
-│   Browser    │────▶│  Docker Container │────▶│  PostgreSQL  │
-│  (xterm.js)  │     │  (FastAPI + SPA)  │     │    (DB)      │
-└─────────────┘     └────────┬─────────┘     └──────────────┘
-                             │ SSH
-                             ▼
-                     ┌───────────────┐
-                     │  Remote VPS   │
-                     │  (Target)     │
-                     └───────────────┘
-```
+Mount points:
+- `~/.ssh:/root/.ssh:ro` — SSH keys dari host
+- `pg-data:/var/lib/postgresql` — data DB persistent

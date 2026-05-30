@@ -1,85 +1,64 @@
-# 🔌 API Reference
+# API Documentation
 
-ServerSphere exposes a REST API for managing servers, users, and authentication.
+Base URL: `http://server-ip:8080`
 
-## Authentication
+## Auth
 
-All API endpoints (except login) require a session cookie.
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/login` | No | Login, dapetin session |
+| POST | `/api/logout` | Yes | Logout |
+| GET | `/api/me` | Yes | Current user info |
 
-### POST /api/login
-
-Authenticate and get a session.
-
+Login body:
 ```json
-Request:
 { "username": "admin", "password": "change-me" }
-
-Response:
-{ "success": true, "user": { "id": 1, "username": "admin", "role": "admin" } }
 ```
 
-### POST /api/logout
-
-End the current session.
-
----
+Response: session cookie (httponly).
 
 ## VPS
 
-### GET /api/vps
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/vps` | Yes | List semua VPS |
+| POST | `/api/vps` | Yes | Tambah VPS baru |
+| GET | `/api/vps/{id}` | Yes | Detail VPS |
+| PUT | `/api/vps/{id}` | Yes | Edit VPS |
+| DELETE | `/api/vps/{id}` | Admin | Hapus VPS |
+| GET | `/api/vps/{id}/status` | Yes | Status online/offline |
+| GET | `/api/vps/{id}/resources` | Yes | CPU, RAM, Disk, Load |
 
-List all VPS servers.
-
+Tambah VPS body:
 ```json
-Response:
-[{ "id": 1, "name": "web-01", "host": "192.168.1.10", "port": 22, "status": "online", "user": "root" }]
+{
+  "name": "web-prod-01",
+  "host": "192.168.1.100",
+  "port": 22,
+  "username": "root",
+  "key_path": "/root/.ssh/id_ed25519"
+}
 ```
-
-### POST /api/vps
-
-Add a new VPS server.
-
-```json
-Request:
-{ "name": "web-01", "host": "192.168.1.10", "port": 22, "user": "root", "key_path": "/root/.ssh/id_ed25519" }
-```
-
-### DELETE /api/vps/{id}
-
-Remove a VPS server.
-
----
 
 ## Users
 
-### GET /api/users
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/users` | Admin | List users |
+| POST | `/api/users` | Admin | Create user |
+| PUT | `/api/users/{id}` | Admin | Edit user |
+| DELETE | `/api/users/{id}` | Admin | Hapus user |
 
-List all users (admin only).
+## Audit Logs
 
-### POST /api/users
-
-Create a new user.
-
-```json
-Request:
-{ "username": "operator1", "password": "secret", "role": "operator", "vps_ids": [1, 2] }
-```
-
-### PUT /api/users/{id}
-
-Update user role or VPS access.
-
-### DELETE /api/users/{id}
-
-Delete a user.
-
----
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/audit-logs` | Yes | List logs (filter: user, action, date) |
 
 ## WebSocket
 
-### WS /api/terminal/{vps_id}
+| Path | Description |
+|------|-------------|
+| `/ws/terminal/{vps_id}` | SSH terminal session |
 
-Open an interactive SSH terminal session.
-
-Connect to `ws://host:8080/api/terminal/{vps_id}` with the session cookie.
-The WebSocket streams terminal I/O bidirectionally.
+Connect pake browser WebSocket API, kirim input, terima output.

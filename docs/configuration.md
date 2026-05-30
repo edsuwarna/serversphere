@@ -1,68 +1,48 @@
-# ⚙️ Configuration
+# Configuration
 
-## Environment Variables (.env)
+## Environment Variables
 
-All configuration is done via environment variables in `.env`:
+Buat file `.env` di samping `docker-compose.yml`:
 
-```
-# Admin credentials
+```env
+# Admin login
 DASHBOARD_USER=admin
-DASHBOARD_PASS=change-me
+DASHBOARD_PASS=ganti-ini
 
-# Server
+# Web server
 DASHBOARD_PORT=8080
-SECRET_KEY=change-this-to-a-random-string
+SECRET_KEY=pake-string-random-yang-panjang
 
 # PostgreSQL
 POSTGRES_DB=vpsdashboard
 POSTGRES_USER=vpsadmin
-POSTGRES_PASSWORD=change-me
-POSTGRES_HOST=db
+POSTGRES_PASSWORD=ganti-ini-juga
+POSTGRES_HOST=serversphere-db
 POSTGRES_PORT=5432
 ```
 
-## Adding a VPS Server
+Kalo gak pake `.env`, bisa langsung di `environment:` di docker-compose.
 
-Via the dashboard:
+## Add VPS
 
-1. Click **"Add VPS"**
-2. Fill in:
-   - **Name** — friendly name (e.g., "web-prod-01")
-   - **Host** — IP or hostname
-   - **SSH Port** — default 22
-   - **SSH User** — e.g., `root`
-   - **SSH Key File Path** — e.g., `/root/.ssh/id_ed25519`
-3. Click Save
+Dari dashboard: **Add VPS** → isi:
 
-SSH keys must exist on the host machine and be mounted into the container.
+| Field | Contoh | Wajib? |
+|-------|--------|--------|
+| Name | web-prod-01 | optional |
+| Host | 192.168.1.100 atau server.example.com | wajib |
+| SSH Port | 22 | optional |
+| SSH User | root | wajib |
+| SSH Key Path | /root/.ssh/id_ed25519 | wajib |
 
-## RBAC Configuration
+SSH key harus ada di host dan termount ke container (lihat `volumes` di docker-compose).
 
-### Roles
+## RBAC
 
-| Role | View VPS | Manage VPS | SSH Terminal | Run Commands | Manage Users |
-|------|----------|------------|--------------|--------------|--------------|
+| Role | View VPS | Manage VPS | SSH | Command | User |
+|------|----------|------------|-----|---------|------|
 | **admin** | ✅ All | ✅ | ✅ | ✅ | ✅ |
 | **operator** | ✅ Assigned | ❌ | ✅ | ✅ | ❌ |
 | **viewer** | ✅ Assigned | ❌ | ❌ | ❌ | ❌ |
 
-### Assigning VPS Access
-
-When creating/editing a user, you can:
-- Leave VPS access empty for access to **all VPS**
-- Select specific VPS for **restricted access**
-
-## Docker Compose Configuration
-
-```yaml
-services:
-  app:
-    ports:
-      - "${DASHBOARD_PORT}:8080"
-    volumes:
-      - ~/.ssh:/root/.ssh:ro  # SSH keys
-      - /var/run/docker.sock:/var/run/docker.sock:ro  # Docker access
-    depends_on:
-      db:
-        condition: service_healthy
-```
+Kalo VPS access kosong, user bisa akses semua server.

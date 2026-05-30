@@ -1,96 +1,94 @@
-# ServerSphere - Multi-Server Management
+# ServerSphere — Multi-Server Management Dashboard
 
-A single-page web dashboard for managing multiple VPS servers via SSH.
+Manage semua VPS dari satu dashboard. SSH terminal, container manager, resource monitor, RBAC — semua dari browser.
 
-## Features
+![ServerSphere](docs/screenshot.png)
 
-- **VPS Overview** — List all servers with online/offline status and resource usage at a glance
-- **SSH Terminal** — Full interactive terminal (xterm.js) via WebSocket
-- **Container Management** — List, start, stop, restart, remove Docker containers
-- **Container Logs & Stats** — View logs and resource usage for each container
-- **System Logs** — View syslog, auth, kernel, docker, nginx logs
-- **Quick Commands** — Run one-off commands with preset buttons
-- **Resource Monitoring** — CPU, RAM, Disk, Load Average with visual bars
-- **User Management** — Create, edit, delete users with role-based access
-- **RBAC** — Admin, Operator, Viewer roles with per-VPS access control
-- **PostgreSQL** — Persistent data storage in PostgreSQL database
+## Jalanin 2 Detik
 
-## Quick Start
+```yaml
+# docker-compose.yml
+services:
+  serversphere:
+    image: ghcr.io/edsuwarna/serversphere:latest
+    container_name: serversphere
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - DASHBOARD_PASS=ganti-ini
+      - SECRET_KEY=ganti-ini-juga
+      - POSTGRES_PASSWORD=ganti-ini
+    volumes:
+      - ~/.ssh:/root/.ssh:ro
+    depends_on:
+      serversphere-db:
+        condition: service_healthy
+
+  serversphere-db:
+    image: postgres:18-alpine
+    container_name: serversphere-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_PASSWORD=ganti-ini
+    volumes:
+      - pg-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vpsadmin -d vpsdashboard"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pg-data:
+```
 
 ```bash
-# 1. Clone or copy the project
-cd serversphere
-
-# 2. (Optional) Edit credentials
-cp .env.example .env
-nano .env
-
-# 3. Launch (includes PostgreSQL + App)
-docker compose up -d --build
-
-# 4. Open in browser
-# http://your-server-ip:8080
+docker compose up -d
+# Buka http://server-ip:8080 — login: admin / ganti-ini
 ```
 
-## Configuration
+## Fitur
 
-Environment variables (set in `.env` or `docker-compose.yml`):
+- **Overview** — Semua server dalam satu halaman, status online/offline, resource usage
+- **SSH Terminal** — Langsung dari browser pake xterm.js via WebSocket
+- **Container Management** — List, start, stop, restart, hapus container di VPS manapun
+- **Logs** — Syslog, auth, kernel, docker, nginx — dari dashboard
+- **Quick Commands** — Tombol preset buat perintah umum
+- **Resource Monitor** — CPU, RAM, Disk, Load Average + visual bar
+- **User Management** — Multi-user dengan role Admin, Operator, Viewer
+- **Audit Logs** — Semua aktivitas tercatat (siapa, apa, dari mana)
 
-| Variable | Default | Description |
-|---|---|---|
-| `DASHBOARD_USER` | `changeme` | Initial admin username |
-| `DASHBOARD_PASS` | `change-me` | Initial admin password |
-| `DASHBOARD_PORT` | `8080` | Port to expose |
-| `SECRET_KEY` | `change-this-...` | Session secret |
-| `POSTGRES_DB` | `vpsdashboard` | Database name |
-| `POSTGRES_USER` | `vpsadmin` | Database user |
-| `POSTGRES_PASSWORD` | `change-me` | Database password |
-
-## RBAC Roles
-
-| Role | View VPS | Manage VPS | SSH Terminal | Run Commands | Manage Users |
-|---|---|---|---|---|---|
-| **admin** | ✅ All | ✅ | ✅ | ✅ | ✅ |
-| **operator** | ✅ Assigned | ❌ | ✅ | ✅ | ❌ |
-| **viewer** | ✅ Assigned | ❌ | ❌ | ❌ | ❌ |
-
-Assign specific VPS to users or leave empty for access to all VPS.
-
-## Architecture
-
-```
-Browser (SPA)  ←→  FastAPI (Python)  ←→  PostgreSQL
-                      ├── REST API (VPS CRUD, users, RBAC)
-                      └── WebSocket (SSH terminal)
-                              └── Paramiko (SSH)
-```
-
-### Tech Stack
+## Tech Stack
 
 - **Backend:** FastAPI, SQLAlchemy, Paramiko (SSH), WebSocket
-- **Database:** PostgreSQL 16
-- **Frontend:** Vanilla JS, xterm.js, CSS (dark theme)
-- **Deployment:** Docker Compose (2 containers: app + db)
+- **Database:** PostgreSQL 18
+- **Frontend:** Vanilla JS, xterm.js, CSS Amber theme (dark/light)
+- **Deployment:** Docker Compose (2 container: app + db)
+- **Registry:** ghcr.io/edsuwarna/serversphere
 
-### Database Tables
+## RBAC
 
-- `users` — User accounts with hashed passwords and roles
-- `vps` — VPS server configurations
-- `user_vps_access` — Junction table for per-user VPS access control
+| Role | VPS | SSH | Command | User |
+|------|-----|-----|---------|------|
+| **Admin** | ✅ All | ✅ | ✅ | ✅ |
+| **Operator** | ✅ Assigned | ✅ | ✅ | ❌ |
+| **Viewer** | ✅ Assigned | ❌ | ❌ | ❌ |
 
-## SSH Key Setup
+## Dokumentasi
 
-The dashboard mounts `~/.ssh` from the host as read-only. To use SSH keys:
+Lengkap di [serversphere.pages.dev](https://serversphere.pages.dev):
+Instalasi, konfigurasi, API, troubleshooting, cara backup.
 
-1. Place your keys on the host: `~/.ssh/id_rsa`, `~/.ssh/id_ed25519`, etc.
-2. When adding a VPS, set the **SSH Key File Path** to `/root/.ssh/your_key`
-
-## Backup
+## Development
 
 ```bash
-# Backup PostgreSQL
-sudo docker exec serversphere-db pg_dump -U vpsadmin vpsdashboard > backup.sql
-
-# Restore
-cat backup.sql | sudo docker exec -i serversphere-db psql -U vpsadmin vpsdashboard
+git clone https://github.com/edsuwarna/serversphere.git
+cd serversphere
+cp .env.example .env
+docker compose up -d --build
 ```
+
+## Lisensi
+
+MIT

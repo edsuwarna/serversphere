@@ -1,23 +1,38 @@
-# ✨ Features
+# Features
 
-## Complete Feature List
+## VPS Overview
+Semua server dalam satu halaman. Lihat status online/offline, IP, resource usage, dan container count.
 
-| # | Feature | Description |
-|---|---------|-------------|
-| 1 | 🖥️ **VPS Overview** | All servers with online/offline status and resource usage |
-| 2 | 💻 **SSH Terminal** | Full interactive terminal (xterm.js) via WebSocket |
-| 3 | 🐳 **Container Management** | List, start, stop, restart, remove Docker containers |
-| 4 | 📋 **Container Logs & Stats** | View logs and resource usage per container |
-| 5 | 📊 **System Logs** | View syslog, auth, kernel, docker, nginx logs |
-| 6 | ⚡ **Quick Commands** | Run one-off commands with preset buttons |
-| 7 | 📈 **Resource Monitoring** | CPU, RAM, Disk, Load Average with visual bars |
-| 8 | 👥 **User Management** | Create, edit, delete users with role-based access |
-| 9 | 🔐 **RBAC** | Admin, Operator, Viewer roles with per-VPS access control |
-| 10 | 🗄 **PostgreSQL** | Persistent data storage in PostgreSQL database |
+## SSH Terminal
+Terminal interaktif dari browser pake xterm.js via WebSocket. Bisa buka banyak tab untuk server berbeda. Copy-paste support, resizable window.
 
-## Upcoming Features
+## Container Management
+List, start, stop, restart, hapus Docker container dari dashboard. Lihat logs dan resource usage per container.
 
-- Real-time metrics with WebSocket streaming
-- Alert thresholds and notifications
+## System Logs
+Akses syslog, auth, kernel, docker, nginx logs langsung dari browser. Gak perlu SSH cuma buat liat log.
+
+## Quick Commands
+Tombol preset buat perintah umum: `df -h`, `free -h`, `uptime`, `docker ps`. Bisa tambah sendiri.
+
+## Resource Monitoring
+CPU bar, RAM used/total, Disk root partition, Load Average (1/5/15 menit). Update real-time.
+
+## User Management & RBAC
+
+| Role | VPS | SSH | Command | User |
+|------|-----|-----|---------|------|
+| **Admin** | ✅ All | ✅ | ✅ | ✅ |
+| **Operator** | ✅ Assigned | ✅ | ✅ | ❌ |
+| **Viewer** | ✅ Assigned | ❌ | ❌ | ❌ |
+
+Assign VPS tertentu ke user, atau kosongin biar akses ke semua VPS.
+
+## Database
+PostgreSQL untuk persistent storage — users, VPS configs, audit logs, access control.
+
+## Rencana ke Depan
+- Real-time metrics via WebSocket streaming
+- Alert thresholds & notifikasi
 - Backup automation UI
 - Multi-cluster support

@@ -1,107 +1,64 @@
-# 🔍 Troubleshooting
+# Troubleshooting
 
-## Docker Issues
-
-### Container won't start
+## Container Gak Mau Start
 
 ```bash
-# Check logs
-docker compose logs app
-
-# Rebuild
-docker compose up -d --build
-
-# Check port conflicts
-sudo lsof -i :8080
+docker compose logs serversphere   # cek error
+docker compose up -d --build       # rebuild
+sudo lsof -i :8080                 # cek port conflict
 ```
 
-### Database connection failed
+## Database Connection Failed
 
 ```bash
-# Check if DB is healthy
-docker compose ps
-
-# Restart DB
-docker compose restart db
-
-# Check DB logs
-docker compose logs db
+docker compose ps                  # cek status
+docker compose logs serversphere-db # cek error DB
+docker compose restart serversphere-db
 ```
 
-## SSH Issues
-
-### "Connection refused"
+## SSH "Connection Refused"
 
 ```bash
-# Test SSH from the host machine
-ssh user@vps-ip
-
-# Check SSH port
-nc -zv vps-ip 22
-
-# Verify VPS credentials in dashboard
+ssh user@vps-ip                    # test dari host
+nc -zv vps-ip 22                   # test port
+# cek lagi credentials VPS di dashboard
 ```
 
-### "Permission denied (publickey)"
+## SSH "Permission Denied (publickey)"
 
 ```bash
-# Check if key exists on host
-ls -la ~/.ssh/
-
-# Test key
-ssh -i ~/.ssh/id_ed25519 user@vps-ip
-
-# Key mounted in container?
-docker compose exec app ls -la /root/.ssh/
+ls -la ~/.ssh/                     # cek key ada di host
+ssh -i ~/.ssh/id_ed25519 user@vps-ip  # test key
+docker compose exec serversphere ls -la /root/.ssh/  # cek mount
 ```
 
-## Login Issues
+## Gak Bisa Login
 
-### Can't log in
+Reset password di `.env` atau environment:
+```
+DASHBOARD_PASS=password-baru
+```
+Trus `docker compose restart serversphere`.
+
+Kalo session expired: clear cookies browser atau relogin. Ganti `SECRET_KEY` bakal invalidate semua session.
+
+## VPS Status Offline
 
 ```bash
-# Reset admin password
-# Set in .env and restart:
-DASHBOARD_USER=admin
-DASHBOARD_PASS=newpassword
-docker compose restart app
+docker compose exec serversphere ping vps-ip  # test koneksi
+docker compose exec serversphere ls -la /root/.ssh/  # cek key
 ```
 
-### "Session expired"
+## Terminal Gak Connect
 
-- Clear browser cookies/cache
-- Re-login
-- Check `SECRET_KEY` in `.env` (changing it invalidates sessions)
-
-## Dashboard Issues
-
-### VPS showing offline
-
+Cek browser DevTools → Network → WS messages. Cek app logs:
 ```bash
-# SSH from dashboard terminal (if available)
-# Check network from app container
-docker compose exec app ping vps-ip
-
-# Verify SSH key permissions
-docker compose exec app ls -la /root/.ssh/
+docker compose logs serversphere | grep -i terminal
 ```
 
-### Terminal not connecting
+## Reset Total
 
 ```bash
-# Check WebSocket endpoint
-# Browser DevTools → Network → WS messages
-
-# Check app logs
-docker compose logs app | grep terminal
-```
-
-## Reset Everything
-
-```bash
-# Stop and remove volumes
-docker compose down -v
-
-# Fresh start
-docker compose up -d --build
+docker compose down -v   # stop + hapus volume
+docker compose up -d     # fresh start
 ```
