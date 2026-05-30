@@ -46,6 +46,15 @@
                 <button type="submit" class="btn btn-primary btn-block">Sign In</button>
                 <div id="loginError" class="error-msg hidden"></div>
             </form>
+            <!-- OIDC / SSO Login -->
+            <div id="oidcSection" class="oidc-section hidden">
+                <div class="oidc-divider"><span>or</span></div>
+                <button id="oidcLoginBtn" class="btn btn-oidc btn-block" onclick="oidcLogin()">
+                    <span class="material-icons">open_in_new</span>
+                    Login with <span id="oidcProviderName">SSO</span>
+                </button>
+                <div id="oidcError" class="error-msg hidden"></div>
+            </div>
         </div>
     </div>
 
@@ -123,11 +132,17 @@
             </div>
         </aside>
 
+        <!-- Sidebar overlay for mobile -->
+        <div class="sidebar-overlay hidden" onclick="closeMobileSidebar()"></div>
+
         <!-- Main Panel -->
         <div class="main-panel">
             <!-- Top Bar -->
             <header class="topbar">
                 <div class="topbar-left">
+                    <button class="icon-btn mobile-menu-btn" onclick="toggleMobileSidebar()" title="Toggle menu" aria-label="Toggle navigation menu">
+                        <span class="material-icons">menu</span>
+                    </button>
                     <h2 class="topbar-title" id="pageTitle">Overview</h2>
                 </div>
                 <div class="topbar-center">
@@ -366,46 +381,46 @@
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td><span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:8px;color:var(--text-muted)">dns</span>View VPS</td>
-                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
-                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
-                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td data-label="">📦 View VPS</td>
+                                    <td style="text-align:center" data-label="Admin"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center" data-label="Operator"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center" data-label="Viewer"><span style="color:var(--success);font-size:20px">✓</span></td>
                                 </tr>
                                 <tr>
-                                    <td><span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:8px;color:var(--text-muted)">terminal</span>SSH Terminal</td>
-                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
-                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
-                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                    <td data-label="">💻 SSH Terminal</td>
+                                    <td style="text-align:center" data-label="Admin"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center" data-label="Operator"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center" data-label="Viewer"><span style="color:var(--danger);font-size:20px">✗</span></td>
                                 </tr>
                                 <tr>
-                                    <td><span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:8px;color:var(--text-muted)">bolt</span>Run Commands</td>
-                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
-                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
-                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                    <td data-label="">⚡ Run Commands</td>
+                                    <td style="text-align:center" data-label="Admin"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center" data-label="Operator"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center" data-label="Viewer"><span style="color:var(--danger);font-size:20px">✗</span></td>
                                 </tr>
                                 <tr>
-                                    <td><span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:8px;color:var(--text-muted)">add_circle</span>Manage VPS (Add/Edit/Delete)</td>
-                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
-                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
-                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                    <td data-label="">➕ Manage VPS (Add/Edit/Delete)</td>
+                                    <td style="text-align:center" data-label="Admin"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center" data-label="Operator"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                    <td style="text-align:center" data-label="Viewer"><span style="color:var(--danger);font-size:20px">✗</span></td>
                                 </tr>
                                 <tr>
-                                    <td><span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:8px;color:var(--text-muted)">people</span>Manage Users</td>
-                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
-                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
-                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                    <td data-label="">👥 Manage Users</td>
+                                    <td style="text-align:center" data-label="Admin"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center" data-label="Operator"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                    <td style="text-align:center" data-label="Viewer"><span style="color:var(--danger);font-size:20px">✗</span></td>
                                 </tr>
                                 <tr>
-                                    <td><span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:8px;color:var(--text-muted)">receipt_long</span>View Audit Logs</td>
-                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
-                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
-                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                    <td data-label="">📋 View Audit Logs</td>
+                                    <td style="text-align:center" data-label="Admin"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center" data-label="Operator"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                    <td style="text-align:center" data-label="Viewer"><span style="color:var(--danger);font-size:20px">✗</span></td>
                                 </tr>
                                 <tr>
-                                    <td><span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:8px;color:var(--text-muted)">view_in_ar</span>Manage Containers (Start/Stop/Restart)</td>
-                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
-                                    <td style="text-align:center"><span style="color:var(--success);font-size:20px">✓</span></td>
-                                    <td style="text-align:center"><span style="color:var(--danger);font-size:20px">✗</span></td>
+                                    <td data-label="">🔄 Manage Containers (Start/Stop/Restart)</td>
+                                    <td style="text-align:center" data-label="Admin"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center" data-label="Operator"><span style="color:var(--success);font-size:20px">✓</span></td>
+                                    <td style="text-align:center" data-label="Viewer"><span style="color:var(--danger);font-size:20px">✗</span></td>
                                 </tr>
                             </tbody>
                         </table>

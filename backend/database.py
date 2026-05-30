@@ -28,6 +28,7 @@ class User(Base):
     password_hash = Column(String(128), nullable=False)
     display_name = Column(String(256), default="")
     role = Column(String(32), default="viewer")  # admin, operator, viewer
+    oidc_sub = Column(String(256), nullable=True, unique=True, index=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(Float, default=time.time)
 
@@ -184,6 +185,21 @@ def init_db():
             print("[Migration] Made github_repos.token_id nullable for public repos")
     except Exception as e:
         print(f"[Migration] github_repos.token_id nullable (may already be): {e}")
+
+    # Migration: add oidc_sub to users for SSO
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name='users' AND column_name='oidc_sub'"
+            ))
+            if not result.fetchone():
+                conn.execute(text("ALTER TABLE users ADD COLUMN oidc_sub VARCHAR(256) UNIQUE"))
+                conn.execute(text("CREATE INDEX ix_users_oidc_sub ON users (oidc_sub)"))
+                conn.commit()
+                print("[Migration] Added oidc_sub column to users for OIDC/SSO")
+    except Exception as e:
+        print(f"[Migration] oidc_sub column (may already exist): {e}")
 
 
 def get_db():

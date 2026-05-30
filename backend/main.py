@@ -22,6 +22,12 @@ from datetime import datetime
 
 import httpx
 from vps_manager import VPSManager, VPSConfig, SSHConnectionPool
+
+# OIDC / SSO
+from authlib.integrations.starlette_client import OAuth
+from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import RedirectResponse
+import re
 from database import (
     init_db, get_db, SessionLocal,
     User as UserModel, VPS as VPSModel, UserVPSAccess, AuditLog as AuditLogModel,
@@ -43,6 +49,32 @@ app = FastAPI(title="VPS Dashboard", version="2.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=[], allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
 # SECURITY: Restrict allow_origins to your deployment domain in production, e.g.:
 # allow_origins=["https://your-domain.com"],
+
+# OIDC / SSO Configuration
+OIDC_ENABLED = os.environ.get("OIDC_ENABLED", "false").lower() == "true"
+OIDC_NAME = os.environ.get("OIDC_NAME", "SSO")
+OIDC_DISCOVERY_URL = os.environ.get("OIDC_DISCOVERY_URL", "")
+OIDC_CLIENT_ID = os.environ.get("OIDC_CLIENT_ID", "")
+OIDC_CLIENT_SECRET = os.environ.get("OIDC_CLIENT_SECRET", "")
+OIDC_SCOPE = os.environ.get("OIDC_SCOPE", "openid profile email")
+OIDC_AUTO_PROVISION = os.environ.get("OIDC_AUTO_PROVISION", "true").lower() == "true"
+OIDC_DEFAULT_ROLE = os.environ.get("OIDC_DEFAULT_ROLE", "viewer")
+OIDC_ADMIN_GROUP = os.environ.get("OIDC_ADMIN_GROUP", "")
+OIDC_OPERATOR_GROUP = os.environ.get("OIDC_OPERATOR_GROUP", "")
+
+# Authlib OAuth client (module-level)
+oauth = OAuth()
+if OIDC_ENABLED and OIDC_DISCOVERY_URL:
+    oauth.register(
+        name="oidc",
+        server_metadata_url=OIDC_DISCOVERY_URL,
+        client_id=OIDC_CLIENT_ID,
+        client_secret=OIDC_CLIENT_SECRET,
+        client_kwargs={"scope": OIDC_SCOPE},
+    )
+
+# Session middleware for OAuth state (separate cookie from our auth session)
+app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, session_cookie="ss_oauth", max_age=600)
 
 manager = VPSManager()
 
@@ -532,6 +564,134 @@ async def auth_me(request: Request):
         "permissions": permissions,
         "accessible_vps": accessible_vps,
     }
+
+
+# ═══════════════════════════════════════════════════════════════
+#  OIDC / SSO ROUTES
+# ═══════════════════════════════════════════════════════════════
+
+@app.get("/api/auth/oidc/config")
+async def oidc_config():
+    """Return OIDC configuration status for the frontend."""
+    return {
+        "enabled": OIDC_ENABLED,
+        "name": OIDC_NAME if OIDC_ENABLED else None,
+    }
+
+
+@app.get("/api/auth/oidc/login")
+async def oidc_login(request: Request):
+    """Redirect user to the OIDC provider for authentication."""
+    if not OIDC_ENABLED or not OIDC_DISCOVERY_URL:
+        raise HTTPException(status_code=404, detail="OIDC not configured")
+    redirect_uri = str(request.base_url) + "api/auth/oidc/callback"
+    return await oauth.oidc.authorize_redirect(request, redirect_uri)
+
+
+@app.get("/api/auth/oidc/callback")
+async def oidc_callback(request: Request):
+    """Handle OIDC callback after provider authentication."""
+    if not OIDC_ENABLED or not OIDC_DISCOVERY_URL:
+        raise HTTPException(status_code=404, detail="OIDC not configured")
+
+    try:
+        token = await oauth.oidc.authorize_access_token(request)
+    except Exception as e:
+        audit_log(request, "oidc_error", resource_type="system", details={"error": str(e)[:200]})
+        return RedirectResponse(url="/?oidc_error=access_denied", status_code=302)
+
+    # Get userinfo (from ID token or userinfo endpoint)
+    userinfo = token.get("userinfo")
+    if not userinfo:
+        try:
+            resp = await oauth.oidc.userinfo(token=token)
+            userinfo = resp
+        except Exception as e:
+            audit_log(request, "oidc_error", resource_type="system", details={"error": f"userinfo_failed: {str(e)[:200]}"})
+            return RedirectResponse(url="/?oidc_error=userinfo_failed", status_code=302)
+
+    if not userinfo or "sub" not in userinfo:
+        return RedirectResponse(url="/?oidc_error=invalid_response", status_code=302)
+
+    oidc_sub = userinfo["sub"]
+    email = userinfo.get("email", "")
+    preferred_username = userinfo.get("preferred_username", "")
+    name = userinfo.get("name", preferred_username)
+
+    db = SessionLocal()
+    try:
+        # Find existing user by OIDC subject
+        user = db.query(UserModel).filter(UserModel.oidc_sub == oidc_sub).first()
+
+        if not user:
+            # Auto-provision new user
+            if not OIDC_AUTO_PROVISION:
+                return RedirectResponse(url="/?oidc_error=not_provisioned", status_code=302)
+
+            # Derive username
+            if preferred_username:
+                username = re.sub(r"[^a-zA-Z0-9_-]", "_", preferred_username)[:128]
+            elif email:
+                username = email.split("@")[0][:128]
+            else:
+                username = f"user_{oidc_sub[-12:]}"
+
+            # Ensure unique username
+            existing = db.query(UserModel).filter(UserModel.username == username).first()
+            if existing:
+                username = f"{username[:100]}_{oidc_sub[-8:]}"
+
+            # Determine role from OIDC groups
+            role = OIDC_DEFAULT_ROLE
+            groups = userinfo.get("groups", [])
+            if OIDC_ADMIN_GROUP and OIDC_ADMIN_GROUP in groups:
+                role = "admin"
+            elif OIDC_OPERATOR_GROUP and OIDC_OPERATOR_GROUP in groups:
+                role = "operator"
+
+            user = UserModel(
+                id=str(uuid.uuid4())[:8],
+                username=username,
+                password_hash=f"oidc:{oidc_sub}",  # cannot login via password
+                display_name=name or preferred_username or username,
+                role=role,
+                is_active=True,
+                oidc_sub=oidc_sub,
+                created_at=time.time(),
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            audit_log(request, "oidc_user_provisioned", resource_type="user",
+                      resource_id=user.id,
+                      details={"username": username, "oidc_sub": oidc_sub, "role": role})
+        else:
+            # Update display name if changed upstream
+            if name and name != user.display_name:
+                user.display_name = name
+                db.commit()
+
+        # Create persistent session (same as password login)
+        token_value = create_session(user, request, remember=True)
+        _sessions[token_value] = {
+            "user": user.username,
+            "user_id": user.id,
+            "role": user.role,
+            "expires": time.time() + 86400 * 7,
+        }
+
+        response = RedirectResponse(url="/", status_code=302)
+        response.set_cookie("session", token_value, httponly=True, max_age=86400 * 7, samesite="lax")
+        audit_log(request, "oidc_login", resource_type="system",
+                  details={"username": user.username, "oidc_sub": oidc_sub})
+        return response
+    except Exception as e:
+        db.rollback()
+        audit_log(request, "oidc_error", resource_type="system",
+                  details={"error": f"provision_failed: {str(e)[:200]}"})
+        return RedirectResponse(url="/?oidc_error=server_error", status_code=302)
+    finally:
+        db.close()
 
 
 # ═══════════════════════════════════════════════════════════════

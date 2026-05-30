@@ -34,6 +34,16 @@ services:
       - SECRET_KEY=${SECRET_KEY:-change-this-to-a-random-secret}
       - DASHBOARD_USER=${DASHBOARD_USER:-admin}
       - DASHBOARD_PASS=${DASHBOARD_PASS:-change-me}
+      - OIDC_ENABLED=${OIDC_ENABLED:-false}
+      - OIDC_NAME=${OIDC_NAME:-Authentik}
+      - OIDC_DISCOVERY_URL=${OIDC_DISCOVERY_URL:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      - OIDC_SCOPE=${OIDC_SCOPE:-openid profile email}
+      - OIDC_AUTO_PROVISION=${OIDC_AUTO_PROVISION:-true}
+      - OIDC_DEFAULT_ROLE=${OIDC_DEFAULT_ROLE:-viewer}
+      - OIDC_ADMIN_GROUP=${OIDC_ADMIN_GROUP:-}
+      - OIDC_OPERATOR_GROUP=${OIDC_OPERATOR_GROUP:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/auth/check')"]
       interval: 30s

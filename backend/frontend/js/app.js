@@ -155,6 +155,7 @@ function showLogin() {
     document.getElementById('loginScreen').classList.remove('hidden');
     document.getElementById('app').classList.add('hidden');
     currentUser = null;
+    checkOidcConfig();
 }
 
 function showApp() {
@@ -178,6 +179,38 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         el.classList.remove('hidden');
     }
 });
+
+// ─── OIDC / SSO ─────────────────────────────────────────────
+async function checkOidcConfig() {
+    try {
+        const cfg = await api('GET', '/auth/oidc/config');
+        if (cfg.enabled) {
+            document.getElementById('oidcSection').classList.remove('hidden');
+            document.getElementById('oidcProviderName').textContent = cfg.name || 'SSO';
+        }
+    } catch {}
+    // Check for OIDC error from callback
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get('oidc_error');
+    if (err) {
+        const msgs = {
+            'access_denied': 'Login cancelled or denied by provider.',
+            'userinfo_failed': 'Failed to fetch user profile from provider.',
+            'invalid_response': 'Invalid response from authentication provider.',
+            'not_provisioned': 'SSO login is not allowed. Contact an administrator.',
+            'server_error': 'Server error during authentication. Please try again.',
+        };
+        const el = document.getElementById('oidcError');
+        el.textContent = msgs[err] || 'Authentication failed: ' + err;
+        el.classList.remove('hidden');
+        // Clean URL
+        window.history.replaceState({}, '', window.location.pathname);
+    }
+}
+
+function oidcLogin() {
+    window.location.href = '/api/auth/oidc/login';
+}
 
 async function logout() {
     try { await api('POST', '/auth/logout'); } catch {}
@@ -3211,6 +3244,31 @@ function toggleTheme() {
     const icon = document.getElementById('themeIcon');
     if (icon) icon.textContent = saved === 'dark' ? 'dark_mode' : 'light_mode';
 })();
+
+// ═══ Mobile Sidebar Toggle ═══
+function toggleMobileSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.querySelector('.sidebar-overlay');
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('hidden');
+  document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : '';
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.querySelector('.sidebar-overlay');
+  sidebar.classList.remove('open');
+  overlay.classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+// Auto-close mobile sidebar when clicking a nav link
+document.addEventListener('click', function(e) {
+  const navItem = e.target.closest('.nav-item');
+  if (navItem && window.innerWidth <= 768) {
+    closeMobileSidebar();
+  }
+});
 
 // ─── Init ───────────────────────────────────────────────────
 checkAuth();
