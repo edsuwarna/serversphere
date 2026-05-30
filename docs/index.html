@@ -53,6 +53,7 @@
         .section-title { font-size: 20px; font-weight: 700; margin: 56px 0 8px; text-align: center; }
         .section-subtitle { font-size: 14px; color: var(--text2); text-align: center; margin-bottom: 28px; }
         .features { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin: 24px 0; }
+        .grid-3 { grid-template-columns: repeat(3, 1fr); }
         .feature-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: 20px; transition: all 0.2s; }
         .feature-card:hover { border-color: var(--accent); transform: translateY(-2px); }
         .feature-card .icon { font-size: 24px; margin-bottom: 8px; }
@@ -143,7 +144,7 @@
 
     <!-- How it works -->
     <h2 class="section-title">💡 How it works</h2>
-    <div class="features" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="features grid-3">
         <div class="feature-card" style="text-align:center;">
             <div class="icon">🔌</div>
             <h3>Connect via SSH</h3>
@@ -280,7 +281,7 @@
 
     <!-- CTA -->
     <div class="cta-section">
-        <h2>Still SSH-ing into 15 servers one by one? 🥲</h2>
+        <h2>Still SSH-ing into each server one by one? 🥲</h2>
         <p>Give it a spin — Docker pull, 2 minutes, done.</p>
         <div class="hero-btns">
             <a href="docs.html?page=quickstart" class="btn btn-primary">⚡ Quick Start</a>
@@ -290,7 +291,7 @@
 
     <!-- Footer -->
     <footer>
-        Built by <a href="https://github.com/edsuwarna">Endang Suwarna</a> — because SSH-ing into 15 servers one by one is a waste of life · MIT License · <a href="https://github.com/edsuwarna/serversphere">GitHub</a>
+        Built by <a href="https://github.com/edsuwarna">Endang Suwarna</a> — because SSH-ing into servers one by one is a waste of life · MIT License · <a href="https://github.com/edsuwarna/serversphere">GitHub</a>
     </footer>
 
     </div>
