@@ -37,6 +37,20 @@ Dari dashboard: **Add VPS** → isi:
 
 SSH key harus ada di host dan termount ke container (lihat `volumes` di docker-compose).
 
+## OIDC / SSO
+
+ServerSphere supports **OpenID Connect** for single sign-on. Setup:
+
+```env
+OIDC_ENABLED=true
+OIDC_NAME="Google Workspace"
+OIDC_DISCOVERY_URL=https://accounts.google.com/.well-known/openid-configuration
+OIDC_CLIENT_ID=your-client-id
+OIDC_CLIENT_SECRET=your-client-secret
+```
+
+> 📖 Full guide: [OIDC / SSO Documentation](docs.html?page=oidc)
+
 ## RBAC
 
 | Role | View VPS | Manage VPS | SSH | Command | User |
