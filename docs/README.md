@@ -2,9 +2,9 @@
 
 **Manage semua VPS dari satu dashboard.** SSH terminal, container manager, resource monitoring, RBAC — semua dari browser tanpa install client atau agent di VPS.
 
-Ini lahir dari masalah gue sendiri: manage 15+ server di Linode, Vultr, DO, sama server lokal. Buka SSH satu-satu itu males banget, apalagi kalo cuma mau ngecek uptime atau restart container. Ditambah kalo ada tim yang perlu akses — kasih SSH key? Gak aman. Bikin VPN? Ribet.
+Gue punya beberapa side project, masing-masing punya VPS sendiri. Setiap kali mau SSH, harus inget IP siapa punya project apa. Kalo ada beberapa orang yang butuh akses, harus add public SSH key satu-satu ke tiap server. Audit log? Susah. Mau install Docker di semua server atau reboot beberapa? Jalanin command satu-satu.
 
-ServerSphere jawabannya: **satu dashboard, semua server, open source.**
+Ada tools lain di luar sana — tapi kebanyakan terlalu kompleks. Gue cuma butuh yang sesuai kebutuhan aja. Jadinya gue bikin ServerSphere. Dibantu AI tentunya 😁
 
 ## Cocok buat siapa?
 

@@ -2,7 +2,9 @@
 
 **Dashboard buat manage banyak VPS dari browser.** SSH terminal, container management, monitoring, RBAC — tanpa install agent di server.
 
-Dibikin karena males SSH ke 15 server satu-satu tiap kali mau ngecek uptime atau restart container. Plus kalo ada tim yang perlu akses — kasih SSH key gak aman, bikin VPN ribet. ServerSphere solusinya — open source, gak perlu subscribe apa-apa.
+Gue punya beberapa side project dengan VPS masing-masing. Tiap SSH harus inget IP mana punya project apa. Kalo ada tim yang perlu akses, add public key satu-satu ke tiap server. Audit log susah. Jalanin command berulang di tiap server males banget.
+
+Tools lain terlalu kompleks. Jadinya bikin sendiri — ServerSphere, open source, dibantu AI 😁
 
 ## Fitur
 

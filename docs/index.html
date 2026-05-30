@@ -126,13 +126,18 @@
     <!-- Problem -->
     <div class="problem">
         <p>
-            <strong>This started from a real problem:</strong> managing 15+ VPS across Linode, Vultr, DigitalOcean, 
-            and a local server — SSH into each one, remember which IP does what, 
-            give team access without handing out SSH keys to every server.
+            I run a few side projects, each with their own VPS. Nothing crazy — but every time I need to 
+            SSH in, I have to remember which IP belongs to which project. Sure, SSH config helps, 
+            but when <strong>multiple people need access</strong>, I'm adding public keys one by one to 
+            every server. Audit logs? Basically non-existent. Need to install Docker on all servers or 
+            reboot a few? Gotta run the same command on each one manually.
         </p>
         <p style="margin-top:12px;">
-            ServerSphere is the answer. A dashboard that handles <strong>SSH, container management, monitoring, 
-            and RBAC</strong> — all from your browser, with zero agents or extra tools on your VPS.
+            There are tools out there that do this — but most of them are way too complex for what I need. 
+            I just wanted something that fits <strong>my use case</strong>, nothing more.
+        </p>
+        <p style="margin-top:12px;">
+            So I built ServerSphere. With a little help from AI, of course 😁
         </p>
     </div>
 

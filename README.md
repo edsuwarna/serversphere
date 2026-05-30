@@ -2,9 +2,9 @@
 
 **Multi-server management dashboard from your browser.** SSH terminal, container management, resource monitoring, RBAC — zero agent, zero client tools.
 
-This started as a personal frustration: managing 15+ VPS across Linode, Vultr, DigitalOcean, and a local server. SSH into each one just to check uptime? `tail -f` logs from separate terminals? Give team members SSH keys to production servers? There had to be a better way.
+I run a few side projects, each with their own VPS. Nothing crazy — but every time I SSH in, I have to remember which IP belongs to which project. When multiple people need access, I'm adding public keys one by one to every server. Audit logs? Non-existent. Need to install Docker on all servers or reboot a few? Gotta run the same command on each one manually.
 
-ServerSphere is that way. **A single web dashboard that talks to all your servers via SSH.** No agents to install, no new protocols to learn. And it's open source — no subscriptions needed.
+There are tools out there — but most are way too complex for what I need. So I built ServerSphere. With a little help from AI, of course 😁
 
 ## What it does
 
