@@ -1,83 +1,44 @@
 # ServerSphere
 
-Manage semua VPS dari satu dashboard. SSH terminal, container manager, resource monitoring, RBAC — semua dari browser tanpa install client.
+**Manage semua VPS dari satu dashboard.** SSH terminal, container manager, resource monitoring, RBAC — semua dari browser tanpa install client atau agent di VPS.
 
-## Cara Jalanin
+Ini lahir dari masalah gue sendiri: manage 15+ server di Linode, Vultr, DO, sama server lokal. Buka SSH satu-satu itu males banget, apalagi kalo cuma mau ngecek uptime atau restart container. Ditambah kalo ada tim yang perlu akses — kasih SSH key? Gak aman. Bikin VPN? Ribet.
 
-Pilih salah satu:
+ServerSphere jawabannya: **satu dashboard, semua server, open source.**
 
-### Pakai Image (Recommended)
+## Cocok buat siapa?
 
-```yaml
-# docker-compose.yml
-services:
-  serversphere:
-    image: ghcr.io/edsuwarna/serversphere:latest
-    container_name: serversphere
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    environment:
-      - DASHBOARD_PASS=ganti-ini
-      - SECRET_KEY=ganti-ini-juga
-      - POSTGRES_PASSWORD=ganti-ini
-    volumes:
-      - ~/.ssh:/root/.ssh:ro
-    depends_on:
-      serversphere-db:
-        condition: service_healthy
-
-  serversphere-db:
-    image: postgres:18-alpine
-    container_name: serversphere-db
-    restart: unless-stopped
-    environment:
-      - POSTGRES_PASSWORD=ganti-ini
-    volumes:
-      - pg-data:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vpsadmin -d vpsdashboard"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  pg-data:
-```
-
-```bash
-docker compose up -d
-```
-
-### Clone & Build
-
-```bash
-git clone https://github.com/edsuwarna/serversphere.git
-cd serversphere
-docker compose up -d --build
-```
-
-## Cocok buat siapa
-
-- **DevOps** — 5-50 VPS dari satu dashboard
-- **Sysadmin** — SSH + monitor tanpa client tools
-- **Team Lead** — Akses terbatas per VPS buat tim
+- **DevOps** — manage 5-50 VPS tanpa buka terminal 50 kali
+- **Sysadmin** — SSH + monitor tanpa install client di laptop
+- **Team Lead** — kasih akses terbatas per VPS ke anggota tim
 
 ## Fitur Utama
 
-- Multi-VPS overview dengan status online/offline
-- SSH terminal via WebSocket (xterm.js)
-- Docker container management dari dashboard
-- System logs viewer (syslog, auth, kernel, docker, nginx)
-- CPU, RAM, Disk monitoring real-time
-- User management + RBAC (Admin/Operator/Viewer)
-- Audit trail lengkap
+- **Multi-VPS overview** — status online/offline, IP, resource usage sekilas
+- **SSH terminal via WebSocket** — xterm.js, full interactive, bisa `apt`, `top`, `vim`
+- **Container management** — list, start, stop, restart dari dashboard
+- **System logs viewer** — syslog, auth, kernel, docker, nginx — gak perlu SSH buat liat log
+- **Resource monitoring** — CPU, RAM, Disk, Load Average
+- **User management + RBAC** — Admin / Operator / Viewer, per-VPS access
+- **Audit trail** — siapa ngapain, dari mana, kapan
 
-## Tech
+## Jalanin
+
+```bash
+# Pake image dari GHCR
+docker compose up -d
+```
+
+Lihat [Installation](/installation) buat detail konfigurasi.
+
+## Tech Stack
 
 **Backend:** FastAPI, SQLAlchemy, Paramiko  
 **Database:** PostgreSQL 18  
 **Frontend:** Vanilla JS, xterm.js  
 **Deploy:** Docker Compose  
+**Auth:** Session-based + future OIDC support
 
-[Installation →](/installation) · [Quick Start →](/quickstart) · [API Docs →](/api) · [GitHub →](https://github.com/edsuwarna/serversphere)
+---
+
+[Quick Start →](/quickstart) · [Installation →](/installation) · [API Docs →](/api) · [GitHub →](https://github.com/edsuwarna/serversphere)

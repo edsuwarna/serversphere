@@ -1,94 +1,51 @@
-# ServerSphere — Multi-Server Management Dashboard
+# ServerSphere 🌐
 
-Manage semua VPS dari satu dashboard. SSH terminal, container manager, resource monitor, RBAC — semua dari browser.
+**Multi-server management dashboard from your browser.** SSH terminal, container management, resource monitoring, RBAC — zero agent, zero client tools.
 
-![ServerSphere](docs/screenshot.png)
+This started as a personal frustration: managing 15+ VPS across Linode, Vultr, DigitalOcean, and a local server. SSH into each one just to check uptime? `tail -f` logs from separate terminals? Give team members SSH keys to production servers? There had to be a better way.
 
-## Jalanin 2 Detik
+ServerSphere is that way. **A single web dashboard that talks to all your servers via SSH.** No agents to install, no new protocols to learn. And it's open source — no subscriptions needed.
 
-```yaml
-# docker-compose.yml
-services:
-  serversphere:
-    image: ghcr.io/edsuwarna/serversphere:latest
-    container_name: serversphere
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    environment:
-      - DASHBOARD_PASS=ganti-ini
-      - SECRET_KEY=ganti-ini-juga
-      - POSTGRES_PASSWORD=ganti-ini
-    volumes:
-      - ~/.ssh:/root/.ssh:ro
-    depends_on:
-      serversphere-db:
-        condition: service_healthy
+## What it does
 
-  serversphere-db:
-    image: postgres:18-alpine
-    container_name: serversphere-db
-    restart: unless-stopped
-    environment:
-      - POSTGRES_PASSWORD=ganti-ini
-    volumes:
-      - pg-data:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vpsadmin -d vpsdashboard"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+- **Multi-VPS overview** — see all servers, their status, IPs, and resource usage at a glance
+- **SSH terminal** — full interactive terminal via WebSocket (xterm.js). Works with `apt`, `top`, `vim` — anything you'd do in a regular SSH session
+- **Container management** — list, start, stop, restart, remove Docker containers across any VPS
+- **System logs** — browse syslog, auth, kernel, docker, nginx logs from the dashboard
+- **Resource monitoring** — CPU, RAM, Disk, Load Average with real-time updates
+- **RBAC** — Admin, Operator, Viewer roles with per-VPS access control
+- **Audit trail** — complete log of who did what, from where, and when
 
-volumes:
-  pg-data:
-```
+## Quick start
 
 ```bash
+# Docker compose — 2 minutes, done
 docker compose up -d
-# Buka http://server-ip:8080 — login: admin / ganti-ini
 ```
 
-## Fitur
+Open `http://your-server:8080` and you're in.
 
-- **Overview** — Semua server dalam satu halaman, status online/offline, resource usage
-- **SSH Terminal** — Langsung dari browser pake xterm.js via WebSocket
-- **Container Management** — List, start, stop, restart, hapus container di VPS manapun
-- **Logs** — Syslog, auth, kernel, docker, nginx — dari dashboard
-- **Quick Commands** — Tombol preset buat perintah umum
-- **Resource Monitor** — CPU, RAM, Disk, Load Average + visual bar
-- **User Management** — Multi-user dengan role Admin, Operator, Viewer
-- **Audit Logs** — Semua aktivitas tercatat (siapa, apa, dari mana)
+## For who?
 
-## Tech Stack
+| You | Why ServerSphere |
+|-----|------------------|
+| **DevOps** | Manage 5-50 VPS from one dashboard. No more 50 terminal tabs. |
+| **Sysadmin** | SSH + monitoring without installing anything on your laptop. |
+| **Team Lead** | Give limited VPS access to team members. See everything in audit logs. |
 
-- **Backend:** FastAPI, SQLAlchemy, Paramiko (SSH), WebSocket
-- **Database:** PostgreSQL 18
-- **Frontend:** Vanilla JS, xterm.js, CSS Amber theme (dark/light)
-- **Deployment:** Docker Compose (2 container: app + db)
-- **Registry:** ghcr.io/edsuwarna/serversphere
+## Tech
 
-## RBAC
+**Backend:** FastAPI, SQLAlchemy, Paramiko  
+**Database:** PostgreSQL 18  
+**Frontend:** Vanilla JS, xterm.js  
+**Deploy:** Docker Compose
 
-| Role | VPS | SSH | Command | User |
-|------|-----|-----|---------|------|
-| **Admin** | ✅ All | ✅ | ✅ | ✅ |
-| **Operator** | ✅ Assigned | ✅ | ✅ | ❌ |
-| **Viewer** | ✅ Assigned | ❌ | ❌ | ❌ |
+## Documentation
 
-## Dokumentasi
+Full docs at **[serversphere.pages.dev](https://serversphere.pages.dev)**
 
-Lengkap di [serversphere.pages.dev](https://serversphere.pages.dev):
-Instalasi, konfigurasi, API, troubleshooting, cara backup.
+[Installation →](https://serversphere.pages.dev/docs.html?page=installation) · [Quick Start →](https://serversphere.pages.dev/docs.html?page=quickstart) · [API Docs →](https://serversphere.pages.dev/docs.html?page=api) · [GitHub →](https://github.com/edsuwarna/serversphere)
 
-## Development
+---
 
-```bash
-git clone https://github.com/edsuwarna/serversphere.git
-cd serversphere
-cp .env.example .env
-docker compose up -d --build
-```
-
-## Lisensi
-
-MIT
+Built by [Endang Suwarna](https://github.com/edsuwarna) — because SSH-ing into 15 servers one by one is a waste of life. MIT License.
