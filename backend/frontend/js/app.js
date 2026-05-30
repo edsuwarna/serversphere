@@ -89,12 +89,17 @@ async function checkAuth() {
             };
             const displayName = currentUser.display_name || currentUser.username;
             document.getElementById('userDisplay').textContent = displayName;
+            // Set avatar initials
+            const initials = displayName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || 'U';
+            const avatarEl = document.getElementById('userAvatarInitials');
+            if (avatarEl) avatarEl.textContent = initials;
             await fetchCurrentUser();  // get full info including vps_access
             applyPermissions();
             showApp();
             return;
         }
     } catch {}
+    // Don't show login error here — called on page load too
     showLogin();
 }
 
@@ -200,6 +205,33 @@ function showPage(page) {
     document.querySelectorAll('.nav-item[data-page]').forEach(n => {
         n.classList.toggle('active', n.dataset.page === page);
     });
+
+    // Update topbar title & search placeholder
+    const pageTitles = {
+        'dashboard': 'Overview',
+        'vps-list': 'Instances',
+        'vps-detail': 'VPS Detail',
+        'users': 'User Management',
+        'audit': 'Audit Logs',
+        'permissions': 'Role Permissions',
+        'ssh-keys': 'SSH Keys',
+        'groups': 'Groups',
+        'github': 'GitHub Actions',
+    };
+    const pageTitleEl = document.getElementById('pageTitle');
+    if (pageTitleEl && pageTitles[page]) {
+        pageTitleEl.textContent = pageTitles[page];
+    }
+    const searchInput = document.getElementById('globalSearch');
+    if (searchInput) {
+        if (page === 'users') {
+            searchInput.placeholder = 'Search users...';
+        } else if (page === 'audit') {
+            searchInput.placeholder = 'Search audit logs...';
+        } else {
+            searchInput.placeholder = 'Search instances...';
+        }
+    }
     if (page === 'dashboard') refreshDashboard();
     if (page === 'vps-list') loadVPSList();
     if (page === 'users') loadUsersList();
@@ -2954,6 +2986,35 @@ function formatBytes(bytes) {
 
 // ═══════════════════════════════════════════════════════════
 // ─── Cost Tracking (Admin Only) ──────────────────────────
+
+// ═══ Password Toggle ═══
+function togglePasswordVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
+    const icon = btn.querySelector('.material-icons');
+    if (icon) icon.textContent = isPassword ? 'visibility' : 'visibility_off';
+}
+
+// ═══ Theme Toggle ═══
+function toggleTheme() {
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme') || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    const icon = document.getElementById('themeIcon');
+    if (icon) icon.textContent = next === 'dark' ? 'dark_mode' : 'light_mode';
+    localStorage.setItem('serversphere-theme', next);
+}
+
+// Load saved theme on startup
+(function initTheme() {
+    const saved = localStorage.getItem('serversphere-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+    const icon = document.getElementById('themeIcon');
+    if (icon) icon.textContent = saved === 'dark' ? 'dark_mode' : 'light_mode';
+})();
 
 // ─── Init ───────────────────────────────────────────────────
 checkAuth();

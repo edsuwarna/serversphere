@@ -152,18 +152,29 @@ _invites = {}
 # ─── Audit Logging Helper ──────────────────────────────────
 
 def audit_log(request, action, resource_type=None, resource_id=None, details=None):
-    """Create an audit log entry."""
+    """Create an audit log entry. Checks both in-memory and DB persistent sessions."""
     db = SessionLocal()
     try:
         token = request.cookies.get("session") if hasattr(request, 'cookies') else None
         user_id = None
         username = "anonymous"
-        if token and token in _sessions:
-            sess = _sessions[token]
-            user_id = sess.get("user_id")
-            user = db.query(UserModel).filter(UserModel.id == user_id).first()
-            if user:
-                username = user.username
+        if token:
+            # Try legacy in-memory session first
+            if token in _sessions:
+                sess = _sessions[token]
+                user_id = sess.get("user_id")
+                user = db.query(UserModel).filter(UserModel.id == user_id).first()
+                if user:
+                    username = user.username
+            else:
+                # Try persistent DB session
+                from database import PersistentSessionModel as PSM
+                db_sess = db.query(PSM).filter(PSM.id == token).first()
+                if db_sess and db_sess.expires > time.time():
+                    user_id = db_sess.user_id
+                    user = db.query(UserModel).filter(UserModel.id == user_id).first()
+                    if user:
+                        username = user.username
 
         log = AuditLogModel(
             id=str(uuid.uuid4())[:12],
@@ -420,7 +431,7 @@ async def login(form: LoginForm, request: Request, response: JSONResponse):
                 "display_name": user_model.display_name,
             })
             max_age = 86400 * 7 if form.remember else 86400
-            resp.set_cookie("session", token, httponly=True, max_age=max_age, samesite="lax", secure=True)
+            resp.set_cookie("session", token, httponly=True, max_age=max_age, samesite="lax")
             audit_log(request, "login", resource_type="system", details={"username": form.username})
             return resp
     finally:
@@ -517,6 +528,18 @@ class UserUpdateForm(BaseModel):
     role: Optional[str] = None
     vps_access: Optional[list] = None
     is_active: Optional[bool] = None
+
+
+class VPSUpdateForm(BaseModel):
+    """Form for updating VPS — all fields optional for partial updates."""
+    name: Optional[str] = None
+    host: Optional[str] = None
+    port: Optional[int] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    key_file: Optional[str] = None
+    tags: Optional[list] = None
+    group: Optional[str] = None
 
 
 class VPSAccessForm(BaseModel):
@@ -827,26 +850,42 @@ async def add_vps(form: VPSCreateForm, request: Request):
 
 
 @app.put("/api/vps/{vps_id}")
-async def update_vps(vps_id: str, form: VPSCreateForm, request: Request):
-    """Update VPS. Admin only."""
+async def update_vps(vps_id: str, form: VPSUpdateForm, request: Request):
+    """Update VPS with partial update support. Admin only."""
     user = require_role("admin")(request)
     db = SessionLocal()
     try:
         existing = db.query(VPSModel).filter(VPSModel.id == vps_id).first()
         if not existing:
             raise HTTPException(status_code=404, detail="VPS not found")
-        existing.name = form.name
-        existing.host = form.host
-        existing.port = form.port
-        existing.username = form.username
-        existing.password = form.password
-        existing.key_file = form.key_file
-        existing.tags = json.dumps(form.tags)
-        existing.group_name = form.group
+        updated_fields = {}
+        if form.name is not None:
+            existing.name = form.name
+            updated_fields["name"] = form.name
+        if form.host is not None:
+            existing.host = form.host
+            updated_fields["host"] = form.host
+        if form.port is not None:
+            existing.port = form.port
+            updated_fields["port"] = form.port
+        if form.username is not None:
+            existing.username = form.username
+            updated_fields["username"] = form.username
+        if form.password is not None:
+            existing.password = form.password
+        if form.key_file is not None:
+            existing.key_file = form.key_file
+        if form.tags is not None:
+            existing.tags = json.dumps(form.tags)
+            updated_fields["tags"] = form.tags
+        if form.group is not None:
+            existing.group_name = form.group
+            updated_fields["group"] = form.group
         db.commit()
-        # Close SSH pool connection for this VPS
-        manager.ssh_pool.close(vps_id)
-        audit_log(request, "vps_update", resource_type="vps", resource_id=vps_id, details={"name": form.name, "host": form.host})
+        # Close SSH pool connection for this VPS if any field changed
+        if updated_fields:
+            manager.ssh_pool.close(vps_id)
+        audit_log(request, "vps_update", resource_type="vps", resource_id=vps_id, details=updated_fields if updated_fields else {"info": "no fields changed"})
         return {"success": True}
     except HTTPException:
         raise

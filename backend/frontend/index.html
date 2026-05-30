@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19,7 +19,13 @@
     <div id="loginScreen" class="login-screen">
         <div class="login-card">
             <div class="login-logo">
-                <span class="material-icons login-icon">cloud_queue</span>
+                <svg viewBox="0 0 48 48" fill="none" style="width:48px;height:48px;display:inline-block;margin-bottom:12px;">
+                    <rect x="4" y="4" width="40" height="40" rx="10" stroke="var(--amber-500)" stroke-width="2.5" fill="none"/>
+                    <rect x="12" y="14" width="8" height="20" rx="2" fill="var(--amber-500)"/>
+                    <rect x="28" y="10" width="8" height="24" rx="2" fill="var(--amber-400)"/>
+                    <circle cx="16" cy="38" r="2.5" fill="var(--emerald-400)"/>
+                    <circle cx="32" cy="38" r="2.5" fill="var(--emerald-400)"/>
+                </svg>
                 <h1>ServerSphere</h1>
                 <p>Multi-Server Management</p>
             </div>
@@ -30,7 +36,12 @@
                 </div>
                 <div class="form-group">
                     <label for="loginPass">Password</label>
-                    <input type="password" id="loginPass" required placeholder="Enter password">
+                    <div class="password-wrapper">
+                        <input type="password" id="loginPass" required placeholder="Enter password">
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('loginPass', this)" tabindex="-1">
+                            <span class="material-icons">visibility_off</span>
+                        </button>
+                    </div>
                 </div>
                 <button type="submit" class="btn btn-primary btn-block">Sign In</button>
                 <div id="loginError" class="error-msg hidden"></div>
@@ -44,11 +55,19 @@
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
-                <span class="material-icons">cloud_done</span>
+                <svg viewBox="0 0 28 28" fill="none">
+                    <rect x="2" y="2" width="24" height="24" rx="6" stroke="var(--amber-500)" stroke-width="2" fill="none"/>
+                    <rect x="7" y="8" width="5" height="12" rx="1.5" fill="var(--amber-500)"/>
+                    <rect x="16" y="6" width="5" height="14" rx="1.5" fill="var(--amber-400)"/>
+                    <circle cx="9.5" cy="22" r="1.5" fill="var(--emerald-400)"/>
+                    <circle cx="18.5" cy="22" r="1.5" fill="var(--emerald-400)"/>
+                </svg>
                 <span class="brand-text">ServerSphere</span>
+                <span class="brand-version">v2.0</span>
             </div>
 
             <nav class="sidebar-nav">
+                <div class="nav-section-label">Main</div>
                 <a href="#" class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')">
                     <span class="material-icons nav-icon">dashboard</span>
                     <span class="nav-label">Overview</span>
@@ -57,6 +76,16 @@
                     <span class="material-icons nav-icon">dns</span>
                     <span class="nav-label">Instances</span>
                 </a>
+                <a href="#" id="navMonitoring" class="nav-item" data-page="monitoring" onclick="showPage('monitoring')" style="display:none">
+                    <span class="material-icons nav-icon">monitoring</span>
+                    <span class="nav-label">Monitoring</span>
+                </a>
+                <a href="#" id="navLogs" class="nav-item" data-page="logs" onclick="showPage('logs')" style="display:none">
+                    <span class="material-icons nav-icon">receipt_long</span>
+                    <span class="nav-label">Logs</span>
+                </a>
+
+                <div class="nav-section-label">Management</div>
                 <a href="#" id="navUsers" class="nav-item" data-page="users" onclick="showPage('users')" style="display:none">
                     <span class="material-icons nav-icon">people</span>
                     <span class="nav-label">Users</span>
@@ -81,20 +110,16 @@
                     <span class="material-icons nav-icon">rocket_launch</span>
                     <span class="nav-label">GitHub Actions</span>
                 </a>
-
             </nav>
 
-            <div class="sidebar-spacer"></div>
-
-            <div class="sidebar-bottom">
-                <a href="#" id="navAddVPS" class="nav-item nav-add" onclick="showAddVPSModal()">
+            <div class="sidebar-footer">
+                <a href="#" class="nav-item nav-add" onclick="showAddVPSModal()">
                     <span class="material-icons nav-icon">add_circle</span>
                     <span class="nav-label">Add Instance</span>
                 </a>
-            </div>
-
-            <div class="sidebar-footer">
-                <div class="version">ServerSphere v2.0</div>
+                <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-light)">
+                    <div class="version">ServerSphere v2.0</div>
+                </div>
             </div>
         </aside>
 
@@ -112,8 +137,11 @@
                     </div>
                 </div>
                 <div class="topbar-right">
-                    <div class="user-menu">
-                        <span class="material-icons user-avatar">account_circle</span>
+                    <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme" id="themeToggleBtn">
+                        <span class="material-icons" id="themeIcon">dark_mode</span>
+                    </button>
+                    <div class="user-menu" onclick="document.getElementById('userMenuDropdown').classList.toggle('hidden')">
+                        <div class="user-avatar" id="userAvatarInitials">ES</div>
                         <span id="userDisplay" class="user-name"></span>
                     </div>
                     <button class="btn btn-ghost btn-sm" onclick="logout()">
@@ -738,7 +766,12 @@
                 <div class="form-row" id="authPasswordField">
                     <div class="form-group" style="flex:1">
                         <label>Password</label>
-                        <input type="password" id="vpsPassword" placeholder="SSH password">
+                        <div class="password-wrapper">
+                            <input type="password" id="vpsPassword" placeholder="SSH password">
+                            <button type="button" class="password-toggle" onclick="togglePasswordVisibility('vpsPassword', this)" tabindex="-1">
+                                <span class="material-icons">visibility_off</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="form-row hidden" id="authKeyField">
@@ -872,7 +905,12 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Password <span id="userPasswordHint" style="font-weight:normal;font-size:12px;color:var(--neutral)">(required for new users)</span></label>
-                        <input type="password" id="userPassword" placeholder="Password">
+                        <div class="password-wrapper">
+                            <input type="password" id="userPassword" placeholder="Password">
+                            <button type="button" class="password-toggle" onclick="togglePasswordVisibility('userPassword', this)" tabindex="-1">
+                                <span class="material-icons">visibility_off</span>
+                            </button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>Role</label>
@@ -1171,7 +1209,12 @@
                 </div>
                 <div class="form-group" style="margin-top:12px;">
                     <label>Personal Access Token *</label>
-                    <input type="password" id="ghTokenValue" placeholder="ghp_xxxxxxxxxxxx">
+                    <div class="password-wrapper">
+                        <input type="password" id="ghTokenValue" placeholder="ghp_xxxxxxxxxxxx">
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('ghTokenValue', this)" tabindex="-1">
+                            <span class="material-icons">visibility_off</span>
+                        </button>
+                    </div>
                     <small style="color:var(--text-muted);font-size:11px;margin-top:4px;display:block;">GitHub PAT with `repo` and `workflow` scopes</small>
                 </div>
                 <div class="form-group" style="margin-top:12px;">

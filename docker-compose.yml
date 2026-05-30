@@ -2,7 +2,7 @@ name: serversphere
 
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: serversphere-db
     restart: unless-stopped
     environment:
@@ -10,7 +10,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-vpsadmin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
     volumes:
-      - pg-data:/var/lib/postgresql/data
+      - pg-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vpsadmin} -d ${POSTGRES_DB:-vpsdashboard}"]
       interval: 5s
