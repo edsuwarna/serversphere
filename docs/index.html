@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ServerSphere — Manage all your VPS from one dashboard</title>
-    <meta name="description" content="ServerSphere: web dashboard buat manage banyak VPS dari satu tempat — SSH terminal, container, monitoring, RBAC. No client tools needed.">
+    <title>ServerSphere — Multi-Server Dashboard</title>
+    <meta name="description" content="ServerSphere: manage all your VPS servers from one web dashboard — SSH terminal, container management, monitoring, RBAC. No client tools needed.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -112,10 +112,10 @@
     <!-- Hero -->
     <div class="hero">
         <div class="hero-badge">🐚 Open source · MIT</div>
-        <h1>Manage semua <span class="highlight">VPS kamu</span> dari satu dashboard</h1>
+        <h1>All your <span class="highlight">VPS servers</span>, one dashboard</h1>
         <div class="subtitle">
-            Punya 5, 10, atau 50 server tersebar di berbagai provider?<br>
-            Stop jumping between SSH tabs. Semua dari browser, tanpa install client.
+            Got 5, 10, or 50 servers scattered across different providers?<br>
+            Stop jumping between SSH tabs. Everything from your browser, no client tools needed.
         </div>
         <div class="hero-btns">
             <a href="docs.html?page=overview" class="btn btn-primary">📖 Documentation</a>
@@ -126,104 +126,104 @@
     <!-- Problem -->
     <div class="problem">
         <p>
-            <strong>Ini dimulai dari masalah gue sendiri:</strong> manage 15+ VPS di Linode, Vultr, DigitalOcean, 
-            sama local server — buka SSH satu-satu, inget IP mana buat apa, 
-            kasih akses ke tim tapi gak mau mereka punya akses full ke semua server.
+            <strong>This started from a real problem:</strong> managing 15+ VPS across Linode, Vultr, DigitalOcean, 
+            and a local server — SSH into each one, remember which IP does what, 
+            give team access without handing out SSH keys to every server.
         </p>
         <p style="margin-top:12px;">
-            ServerSphere lahir dari situ. Dashboard yang ngelakuin <strong>SSH, container management, monitoring, 
-            dan RBAC</strong> — semua dari browser, tanpa agent atau tools tambahan di VPS.
+            ServerSphere is the answer. A dashboard that handles <strong>SSH, container management, monitoring, 
+            and RBAC</strong> — all from your browser, with zero agents or extra tools on your VPS.
         </p>
     </div>
 
     <!-- How it works -->
-    <h2 class="section-title">💡 Cara kerjanya</h2>
+    <h2 class="section-title">💡 How it works</h2>
     <div class="features" style="grid-template-columns: repeat(3, 1fr);">
         <div class="feature-card" style="text-align:center;">
             <div class="icon">🔌</div>
             <h3>Connect via SSH</h3>
-            <p>ServerSphere pake Paramiko buat SSH ke VPS kamu. <strong>Gak perlu install agent</strong> — cukup SSH key kayak biasa.</p>
+            <p>ServerSphere uses Paramiko to SSH into your servers. <strong>No agent to install</strong> — just your regular SSH keys.</p>
         </div>
         <div class="feature-card" style="text-align:center;">
             <div class="icon">📡</div>
             <h3>Data via SSH</h3>
-            <p>Semua data — status server, container, logs, metrics — diambil real-time lewat koneksi SSH. Satu port, zero config.</p>
+            <p>Server status, containers, logs, metrics — all fetched in real-time over your existing SSH connection. One port, zero config.</p>
         </div>
         <div class="feature-card" style="text-align:center;">
             <div class="icon">🌐</div>
-            <h3>Dashboard di browser</h3>
-            <p>Semua tersaji di web UI. Terminal interaktif, container controls, monitoring graphs — tinggal klik.</p>
+            <h3>Dashboard in your browser</h3>
+            <p>Everything served in a clean web UI. Interactive terminal, container controls, monitoring graphs — point and click.</p>
         </div>
     </div>
 
     <!-- Features -->
-    <h2 class="section-title">✨ Fitur</h2>
-    <p class="section-subtitle">Gak usah SSH cuma buat ngecek uptime atau restart container</p>
+    <h2 class="section-title">✨ Features</h2>
+    <p class="section-subtitle">Stop SSH-ing just to check uptime or restart a container</p>
     <div class="features">
         <div class="feature-card">
             <div class="icon">🗺️</div>
             <h3>VPS Overview</h3>
-            <p>Semua server dalam satu halaman. Status online/offline, IP, resource usage — langsung kelihatan mana yang merah.</p>
+            <p>All servers on one page. Status, IP, resource usage — immediately see which one is down.</p>
         </div>
         <div class="feature-card">
             <div class="icon">💻</div>
             <h3>SSH Terminal</h3>
-            <p>Terminal beneran via WebSocket (xterm.js). Bisa <code>apt update</code>, <code>top</code>, <code>vim</code> — dari browser. Buka banyak tab, beda server.</p>
+            <p>Full interactive terminal via WebSocket (xterm.js). Run <code>apt update</code>, <code>top</code>, <code>vim</code> — right from your browser. Multiple tabs for different servers.</p>
         </div>
         <div class="feature-card">
             <div class="icon">🐳</div>
             <h3>Container Management</h3>
-            <p>List, start, stop, restart, hapus container dari dashboard. Lihat logs & resource usage per container. Gak perlu <code>docker ps</code> tiap kali.</p>
+            <p>List, start, stop, restart, remove containers from the dashboard. View logs & resource usage per container. No more <code>docker ps</code> every time.</p>
         </div>
         <div class="feature-card">
             <div class="icon">📋</div>
             <h3>System Logs</h3>
-            <p>Akses syslog, auth, kernel, docker, nginx logs langsung. Filter by severity, cari keyword. No more <code>tail -f</code> SSH sessions.</p>
+            <p>Browse syslog, auth, kernel, docker, nginx logs directly. Filter by severity, search keywords. No more <code>tail -f</code> SSH sessions.</p>
         </div>
         <div class="feature-card">
             <div class="icon">📊</div>
             <h3>Resource Monitoring</h3>
-            <p>CPU bar, RAM used/total, Disk root, Load Average. Visual progress bars, real-time updates.</p>
+            <p>CPU bars, RAM used/total, disk usage, load average. Visual progress bars with real-time updates.</p>
         </div>
         <div class="feature-card">
             <div class="icon">🔐</div>
             <h3>RBAC + User Management</h3>
-            <p>Admin, Operator, Viewer — per VPS access control. Kasih akses tim tanpa kasih SSH key. Audit trail semua aktivitas.</p>
+            <p>Admin, Operator, Viewer roles with per-VPS access control. Give your team access without sharing SSH keys. Full audit trail.</p>
         </div>
     </div>
 
     <!-- Who is it for -->
-    <h2 class="section-title">🎯 Cocok buat</h2>
+    <h2 class="section-title">🎯 Who is it for</h2>
     <div class="who-section">
         <div class="who-grid">
             <div class="who-card">
                 <div class="role">🧑‍💻 DevOps</div>
-                <p>Manage 5-50 VPS dari satu dashboard. Gak perlu buka terminal 50 kali.</p>
+                <p>Manage 5-50 VPS from a single dashboard without opening 50 terminal tabs.</p>
             </div>
             <div class="who-card">
                 <div class="role">👨‍🔧 Sysadmin</div>
-                <p>Monitor, terminal, container ops tanpa install client di laptop masing-masing.</p>
+                <p>Monitor servers, run terminals, manage containers without installing anything on your laptop.</p>
             </div>
             <div class="who-card">
                 <div class="role">👥 Team Lead</div>
-                <p>Kasih akses terbatas per VPS ke anggota tim. Lihat siapa ngapain aja via audit log.</p>
+                <p>Give limited VPS access to team members. See who did what with the full audit log.</p>
             </div>
         </div>
     </div>
 
     <!-- Install -->
-    <h2 class="section-title">🚀 Jalanin 2 menit</h2>
-    <p class="section-subtitle">Docker image siap pakai, tinggal <code>docker compose up -d</code></p>
+    <h2 class="section-title">🚀 Run in 2 minutes</h2>
+    <p class="section-subtitle">Docker image ready to go — just <code>docker compose up -d</code></p>
     <div class="install-box">
         <div class="tabs">
-            <div class="tab active" onclick="switchTab('pull')">Pakai Image</div>
+            <div class="tab active" onclick="switchTab('pull')">Use Image</div>
             <div class="tab" onclick="switchTab('clone')">Clone & Build</div>
         </div>
 
         <div id="tab-pull" class="tab-content active">
             <div class="code-block">
                 <code>
-                    <span class="comment"># docker-compose.yml — image dari GHCR, gak perlu clone repo</span><br>
+                    <span class="comment"># docker-compose.yml — image from GHCR, no repo clone needed</span><br>
                     services:<br>
                     &nbsp;&nbsp;serversphere:<br>
                     &nbsp;&nbsp;&nbsp;&nbsp;image: ghcr.io/edsuwarna/serversphere:latest<br>
@@ -232,9 +232,9 @@
                     &nbsp;&nbsp;&nbsp;&nbsp;ports:<br>
                     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- "8080:8080"<br>
                     &nbsp;&nbsp;&nbsp;&nbsp;environment:<br>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- DASHBOARD_PASS=ganti-ini<br>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- SECRET_KEY=ganti-ini-juga<br>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- POSTGRES_PASSWORD=ganti-ini<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- DASHBOARD_PASS=change-me<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- SECRET_KEY=change-me-too<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- POSTGRES_PASSWORD=change-me<br>
                     &nbsp;&nbsp;&nbsp;&nbsp;volumes:<br>
                     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- ~/.ssh:/root/.ssh:ro<br>
                     &nbsp;&nbsp;&nbsp;&nbsp;depends_on:<br>
@@ -245,7 +245,7 @@
                     &nbsp;&nbsp;&nbsp;&nbsp;container_name: serversphere-db<br>
                     &nbsp;&nbsp;&nbsp;&nbsp;restart: unless-stopped<br>
                     &nbsp;&nbsp;&nbsp;&nbsp;environment:<br>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- POSTGRES_PASSWORD=ganti-ini<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- POSTGRES_PASSWORD=change-me<br>
                     &nbsp;&nbsp;&nbsp;&nbsp;volumes:<br>
                     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- pg-data:/var/lib/postgresql<br>
                     &nbsp;&nbsp;&nbsp;&nbsp;healthcheck:<br>
@@ -257,16 +257,16 @@
                     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pg-data:
                 </code>
             </div>
-            <p style="margin-top: 12px;">Jalankan: <code style="display:inline; padding: 4px 8px;">docker compose up -d</code> — buka <code style="display:inline; padding: 4px 8px;">http://server-ip:8080</code></p>
+            <p style="margin-top: 12px;">Run: <code style="display:inline; padding: 4px 8px;">docker compose up -d</code> — open <code style="display:inline; padding: 4px 8px;">http://server-ip:8080</code></p>
         </div>
 
         <div id="tab-clone" class="tab-content">
             <div class="code-block">
                 <code>
-                    <span class="comment"># Clone repo & build sendiri</span><br>
+                    <span class="comment"># Clone repo & build yourself</span><br>
                     git clone https://github.com/edsuwarna/serversphere.git<br>
                     cd serversphere<br><br>
-                    <span class="comment"># Build & jalanin</span><br>
+                    <span class="comment"># Build & run</span><br>
                     docker compose up -d --build
                 </code>
             </div>
@@ -275,8 +275,8 @@
 
     <!-- CTA -->
     <div class="cta-section">
-        <h2>Langganan SSH ke 15 server sekaligus? 🥲</h2>
-        <p>Coba aja dulu — Docker pull, 2 menit beres.</p>
+        <h2>Still SSH-ing into 15 servers one by one? 🥲</h2>
+        <p>Give it a spin — Docker pull, 2 minutes, done.</p>
         <div class="hero-btns">
             <a href="docs.html?page=quickstart" class="btn btn-primary">⚡ Quick Start</a>
             <a href="https://github.com/edsuwarna/serversphere" class="btn btn-secondary">⭐ GitHub</a>
@@ -285,7 +285,7 @@
 
     <!-- Footer -->
     <footer>
-        Built by <a href="https://github.com/edsuwarna">Endang Suwarna</a> — karena males SSH ke 15 server satu-satu · MIT License · <a href="https://github.com/edsuwarna/serversphere">GitHub</a>
+        Built by <a href="https://github.com/edsuwarna">Endang Suwarna</a> — because SSH-ing into 15 servers one by one is a waste of life · MIT License · <a href="https://github.com/edsuwarna/serversphere">GitHub</a>
     </footer>
 
     </div>
