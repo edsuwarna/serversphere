@@ -418,6 +418,158 @@ ps aux --sort=-%mem | head -8
         r = self.ssh_pool.execute(vps, cmd, timeout=15)
         return r["stdout"] if r["success"] else r["stderr"]
 
+    # ─── Docker Compose ──────────────────────────────────────
+
+    def get_compose_files(self, vps: VPSConfig) -> list:
+        """Find docker-compose files on the VPS."""
+        cmd = """find / -maxdepth 4 -name 'docker-compose*' -o -name 'compose.yaml' 2>/dev/null | grep -v '/proc/\\|/sys/\\|/snap/\\|/var/lib/docker/' | sort -u"""
+        r = self.ssh_pool.execute(vps, cmd, timeout=15)
+        if not r["success"]:
+            return []
+        files = [f.strip() for f in r["stdout"].strip().split("\n") if f.strip()]
+        # Enrich with directory info
+        result = []
+        seen_dirs = set()
+        for f in files:
+            d = os.path.dirname(f)
+            if d not in seen_dirs:
+                seen_dirs.add(d)
+                # Get project name from directory or docker-compose header
+                name_cmd = f"cd '{d}' && docker compose ps --format '{{{{.Name}}}}' 2>/dev/null | head -1"
+                nr = self.ssh_pool.execute(vps, name_cmd, timeout=10)
+                project = os.path.basename(d)
+                if nr["success"] and nr["stdout"].strip():
+                    # Extract project name from container name (project_service_N)
+                    parts = nr["stdout"].strip().split("_")
+                    if len(parts) >= 2:
+                        project = parts[0]
+                result.append({
+                    "path": d,
+                    "file": f,
+                    "project": project,
+                })
+        return result
+
+    def get_compose_ps(self, vps: VPSConfig, path: str) -> list:
+        """Get status of compose services in a directory."""
+        cmd = f"cd '{path}' && docker compose ps --format '{{{{.Name}}}}|{{{{.Status}}}}|{{{{.Image}}}}|{{{{.Ports}}}}' 2>/dev/null"
+        r = self.ssh_pool.execute(vps, cmd, timeout=15)
+        if not r["success"]:
+            return [{"error": r["stderr"]}]
+        services = []
+        for line in r["stdout"].strip().split("\n"):
+            if not line.strip():
+                continue
+            parts = line.split("|")
+            if len(parts) >= 3:
+                status = parts[1]
+                services.append({
+                    "name": parts[0],
+                    "status": status,
+                    "state": "running" if "Up" in status else ("paused" if "Paused" in status else "stopped"),
+                    "image": parts[2],
+                    "ports": parts[3] if len(parts) > 3 else "",
+                })
+        return services
+
+    def compose_action(self, vps: VPSConfig, path: str, action: str) -> dict:
+        """Run a docker compose action: up, down, restart, pull, stop."""
+        valid = {"up", "down", "restart", "pull", "stop", "start"}
+        if action not in valid:
+            return {"success": False, "error": f"Invalid action: {action}"}
+        if action == "up":
+            cmd = f"cd '{path}' && docker compose up -d 2>&1"
+        elif action == "restart":
+            cmd = f"cd '{path}' && docker compose restart 2>&1"
+        else:
+            cmd = f"cd '{path}' && docker compose {action} 2>&1"
+        r = self.ssh_pool.execute(vps, cmd, timeout=60)
+        return {"success": r["success"], "output": r["stdout"], "error": r["stderr"]}
+
+    # ─── Cron Jobs ────────────────────────────────────────────
+
+    def get_crontab(self, vps: VPSConfig, user: str = "") -> dict:
+        """Get crontab content. Returns entries and raw text."""
+        prefix = f"sudo -u {user} " if user else ""
+        cmd = f"{prefix}crontab -l 2>&1"
+        r = self.ssh_pool.execute(vps, cmd, timeout=10)
+        if not r["success"]:
+            if "no crontab" in r["stderr"].lower():
+                return {"entries": [], "raw": "", "empty": True}
+            return {"error": r["stderr"], "entries": [], "raw": ""}
+        raw = r["stdout"].strip()
+        entries = []
+        for line in raw.split("\n"):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            entries.append({"raw": line, "schedule": "", "command": line})
+        return {"entries": entries, "raw": raw, "empty": not bool(raw)}
+
+    def set_crontab(self, vps: VPSConfig, content: str, user: str = "") -> dict:
+        """Set crontab content."""
+        prefix = f"sudo -u {user} " if user else ""
+        # Escape for safe pipe
+        import base64
+        encoded = base64.b64encode(content.encode()).decode()
+        cmd = f'echo "{encoded}" | base64 -d | {prefix}crontab - 2>&1'
+        r = self.ssh_pool.execute(vps, cmd, timeout=10)
+        return {"success": r["success"], "output": r["stdout"], "error": r["stderr"]}
+
+    # ─── Network Diagnostics ─────────────────────────────────
+
+    def network_ping(self, vps: VPSConfig, target: str, count: int = 4) -> dict:
+        """Ping a target from the VPS."""
+        cmd = f"ping -c {count} -W 5 {target} 2>&1"
+        r = self.ssh_pool.execute(vps, cmd, timeout=30)
+        # Parse summary
+        output = r["stdout"]
+        stats = {}
+        for line in output.split("\n"):
+            if "packets transmitted" in line:
+                parts = line.split(",")
+                stats["transmitted"] = parts[0].strip().split()[0]
+                stats["received"] = parts[1].strip().split()[0] if len(parts) > 1 else "0"
+                stats["packet_loss"] = parts[2].strip().split()[0] if len(parts) > 2 else "100%"
+            elif "min/avg/max" in line or "rtt min" in line:
+                m = line.split("=")[-1].strip().split("/")
+                if len(m) >= 3:
+                    stats["min_ms"] = m[0]
+                    stats["avg_ms"] = m[1]
+                    stats["max_ms"] = m[2]
+        return {"success": r["success"], "output": output, "stats": stats, "error": r["stderr"]}
+
+    def network_traceroute(self, vps: VPSConfig, target: str) -> dict:
+        """Traceroute to a target from the VPS."""
+        cmd = f"traceroute -n -w 3 {target} 2>&1 || traceroute {target} 2>&1"
+        r = self.ssh_pool.execute(vps, cmd, timeout=60)
+        hops = []
+        for line in r["stdout"].split("\n"):
+            line = line.strip()
+            if not line or "traceroute to" in line:
+                continue
+            hops.append(line)
+        return {"success": r["success"], "hops": hops, "output": r["stdout"], "error": r["stderr"]}
+
+    def network_dns_lookup(self, vps: VPSConfig, domain: str, record_type: str = "A") -> dict:
+        """DNS lookup from the VPS."""
+        cmd = f"dig {domain} {record_type} +short 2>&1 || nslookup {domain} 2>&1 || host {domain} 2>&1"
+        r = self.ssh_pool.execute(vps, cmd, timeout=15)
+        results = [line.strip() for line in r["stdout"].split("\n") if line.strip()]
+        return {"success": r["success"], "results": results, "output": r["stdout"], "error": r["stderr"]}
+
+    def network_port_check(self, vps: VPSConfig, target: str, port: int, protocol: str = "tcp") -> dict:
+        """Check if a port is open from the VPS."""
+        cmd = f"nc -zv -w 5 {target} {port} 2>&1 || timeout 5 bash -c 'echo >/dev/{protocol}/{target}/{port}' 2>&1 || echo 'Port {port} check failed'"
+        r = self.ssh_pool.execute(vps, cmd, timeout=15)
+        open_status = "succeeded" in r["stdout"].lower() or "open" in r["stdout"].lower()
+        return {
+            "success": r["success"],
+            "port_open": open_status or not r["success"],
+            "output": r["stdout"],
+            "error": r["stderr"],
+        }
+
     def test_connection(self, vps: VPSConfig) -> Dict[str, Any]:
         """Test SSH connection to a VPS."""
         try:

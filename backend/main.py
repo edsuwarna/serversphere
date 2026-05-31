@@ -23,6 +23,11 @@ from datetime import datetime
 import httpx
 from vps_manager import VPSManager, VPSConfig, SSHConnectionPool
 
+# TOTP 2FA
+import pyotp
+import base64
+import io
+
 # OIDC / SSO
 from authlib.integrations.starlette_client import OAuth
 from starlette.middleware.sessions import SessionMiddleware
@@ -39,6 +44,7 @@ from database import (
     seed_default_admin, get_user_vps_access, set_user_vps_access,
     hash_password as db_hash_password,
     get_user_group_ids, get_user_group_names, set_user_group_access, get_effective_vps_access,
+    CronJob as CronJobModel,
 )
 
 # ─── Config ──────────────────────────────────────────────────
@@ -530,6 +536,118 @@ async def auth_check(request: Request):
         finally:
             db.close()
     return {"authenticated": False}
+
+
+# ═══════════════════════════════════════════════════════════════
+#  TOTP 2FA
+# ═══════════════════════════════════════════════════════════════
+
+@app.get("/api/auth/totp/status")
+async def totp_status(request: Request):
+    """Check if user has TOTP configured."""
+    user = get_current_user(request)
+    db = SessionLocal()
+    try:
+        user_model = db.query(UserModel).filter(UserModel.id == user["id"]).first()
+        if not user_model:
+            raise HTTPException(status_code=404, detail="User not found")
+        return {
+            "enabled": user_model.totp_enabled or False,
+            "has_secret": bool(user_model.totp_secret),
+        }
+    finally:
+        db.close()
+
+
+@app.post("/api/auth/totp/setup")
+async def totp_setup(request: Request):
+    """Generate TOTP secret and return provisioning URI + QR code."""
+    user = get_current_user(request)
+    db = SessionLocal()
+    try:
+        user_model = db.query(UserModel).filter(UserModel.id == user["id"]).first()
+        if not user_model:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Generate new secret
+        secret = pyotp.random_base32()
+        user_model.totp_secret = secret
+        user_model.totp_enabled = False  # not verified yet
+        db.commit()
+
+        # Generate provisioning URI
+        issuer = "ServerSphere"
+        totp = pyotp.TOTP(secret)
+        uri = totp.provisioning_uri(name=user_model.username, issuer_name=issuer)
+
+        # Generate QR code as base64
+        try:
+            import qrcode
+            qr = qrcode.QRCode(box_size=6, border=2)
+            qr.add_data(uri)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="darkblue", back_color="white")
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            qr_b64 = base64.b64encode(buf.getvalue()).decode()
+        except ImportError:
+            qr_b64 = None
+
+        return {
+            "success": True,
+            "secret": secret,
+            "uri": uri,
+            "qr_base64": qr_b64,
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+class TOTPVerifyBody(BaseModel):
+    code: str
+
+
+@app.post("/api/auth/totp/verify")
+async def totp_verify(body: TOTPVerifyBody, request: Request):
+    """Verify a TOTP code and enable 2FA."""
+    user = get_current_user(request)
+    db = SessionLocal()
+    try:
+        user_model = db.query(UserModel).filter(UserModel.id == user["id"]).first()
+        if not user_model or not user_model.totp_secret:
+            raise HTTPException(status_code=400, detail="TOTP not set up yet")
+
+        totp = pyotp.TOTP(user_model.totp_secret)
+        if totp.verify(body.code):
+            user_model.totp_enabled = True
+            db.commit()
+            return {"success": True, "message": "TOTP enabled successfully"}
+        return {"success": False, "message": "Invalid code"}
+    finally:
+        db.close()
+
+
+@app.post("/api/auth/totp/disable")
+async def totp_disable(request: Request):
+    """Disable TOTP 2FA."""
+    user = get_current_user(request)
+    db = SessionLocal()
+    try:
+        user_model = db.query(UserModel).filter(UserModel.id == user["id"]).first()
+        if not user_model:
+            raise HTTPException(status_code=404, detail="User not found")
+        user_model.totp_secret = None
+        user_model.totp_enabled = False
+        db.commit()
+        return {"success": True, "message": "TOTP disabled"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
 @app.get("/api/auth/me")
@@ -1251,6 +1369,279 @@ async def container_action(vps_id: str, container_id: str, body: ContainerAction
         audit_log(request, f"container_{body.action}", resource_type="container", resource_id=container_id, details={"vps_id": vps_id})
         return {"success": True, "output": r["stdout"]}
     return {"success": False, "error": r["stderr"]}
+
+
+# ═══════════════════════════════════════════════════════════════
+#  DOCKER COMPOSE MANAGEMENT
+# ═══════════════════════════════════════════════════════════════
+
+@app.get("/api/vps/{vps_id}/compose/files")
+async def compose_list_files(vps_id: str, request: Request):
+    """List docker-compose files on a VPS. operator+viewer with access."""
+    user = require_auth(request)
+    vps = get_vps_and_check_access(vps_id, user)
+    return manager.get_compose_files(vps)
+
+
+@app.get("/api/vps/{vps_id}/compose/ps")
+async def compose_ps(vps_id: str, path: str = "", request: Request = None):
+    """Get compose service status. operator+viewer with access."""
+    user = require_auth(request)
+    vps = get_vps_and_check_access(vps_id, user)
+    if not path:
+        raise HTTPException(status_code=400, detail="path query parameter is required")
+    return manager.get_compose_ps(vps, path)
+
+
+class ComposeActionBody(BaseModel):
+    path: str
+    action: str  # up, down, restart, pull, stop, start
+
+
+@app.post("/api/vps/{vps_id}/compose/action")
+async def compose_do_action(vps_id: str, body: ComposeActionBody, request: Request):
+    """Run a docker compose action. operator+ only."""
+    user = get_current_user(request)
+    if not role_has_access(user["role"], "operator"):
+        raise HTTPException(status_code=403, detail="Operator role required")
+    vps = get_vps_and_check_access(vps_id, user)
+    result = manager.compose_action(vps, body.path, body.action)
+    audit_log(request, f"compose_{body.action}", resource_type="vps",
+              resource_id=vps_id, details={"path": body.path, "action": body.action})
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CRON JOB MANAGEMENT
+# ═══════════════════════════════════════════════════════════════
+
+@app.get("/api/vps/{vps_id}/crontab")
+async def get_crontab(vps_id: str, cron_user: str = "", request: Request = None):
+    """Get crontab entries. operator+viewer with access."""
+    user = require_auth(request)
+    vps = get_vps_and_check_access(vps_id, user)
+    return manager.get_crontab(vps, cron_user)
+
+
+class CrontabSetBody(BaseModel):
+    content: str
+    cron_user: str = ""
+
+
+@app.put("/api/vps/{vps_id}/crontab")
+async def set_crontab(vps_id: str, body: CrontabSetBody, request: Request):
+    """Set crontab content. operator+ only."""
+    user = get_current_user(request)
+    if not role_has_access(user["role"], "operator"):
+        raise HTTPException(status_code=403, detail="Operator role required")
+    vps = get_vps_and_check_access(vps_id, user)
+    result = manager.set_crontab(vps, body.content, body.cron_user)
+    audit_log(request, "crontab_update", resource_type="vps", resource_id=vps_id,
+              details={"user": body.cron_user or "current"})
+    return result
+
+
+# ─── Stored Cron Jobs (DB-persisted) ─────────────────────────
+
+class CronJobCreate(BaseModel):
+    vps_id: str
+    name: str
+    schedule: str
+    command: str
+    description: str = ""
+
+
+class CronJobUpdate(BaseModel):
+    name: Optional[str] = None
+    schedule: Optional[str] = None
+    command: Optional[str] = None
+    description: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
+@app.get("/api/cron-jobs")
+async def list_cron_jobs(vps_id: str = None, request: Request = None):
+    """List stored cron jobs for a VPS or all. operator+ with access."""
+    user = require_auth(request)
+    db = SessionLocal()
+    try:
+        query = db.query(CronJobModel).order_by(CronJobModel.created_at.desc())
+        if vps_id:
+            if not check_vps_access(user, vps_id):
+                raise HTTPException(status_code=403, detail="Access denied")
+            query = query.filter(CronJobModel.vps_id == vps_id)
+        jobs = query.all()
+        return [{
+            "id": j.id,
+            "vps_id": j.vps_id,
+            "name": j.name,
+            "schedule": j.schedule,
+            "command": j.command,
+            "description": j.description,
+            "enabled": j.enabled,
+            "created_at": j.created_at,
+            "updated_at": j.updated_at,
+        } for j in jobs]
+    finally:
+        db.close()
+
+
+@app.post("/api/cron-jobs", status_code=201)
+async def create_cron_job(data: CronJobCreate, request: Request):
+    """Create a stored cron job. operator+ only."""
+    user = get_current_user(request)
+    if not role_has_access(user["role"], "operator"):
+        raise HTTPException(status_code=403, detail="Operator role required")
+    if not check_vps_access(user, data.vps_id):
+        raise HTTPException(status_code=403, detail="Access denied to this VPS")
+    db = SessionLocal()
+    try:
+        job = CronJobModel(
+            id=str(uuid.uuid4())[:8],
+            vps_id=data.vps_id,
+            name=data.name,
+            schedule=data.schedule,
+            command=data.command,
+            description=data.description,
+            created_by=user["id"],
+            created_at=time.time(),
+            updated_at=time.time(),
+        )
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+        audit_log(request, "cronjob_create", resource_type="vps", resource_id=data.vps_id,
+                  details={"name": data.name, "schedule": data.schedule})
+        return {"success": True, "id": job.id}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        db.close()
+
+
+@app.put("/api/cron-jobs/{job_id}")
+async def update_cron_job(job_id: str, data: CronJobUpdate, request: Request):
+    """Update a stored cron job. operator+ only."""
+    user = get_current_user(request)
+    if not role_has_access(user["role"], "operator"):
+        raise HTTPException(status_code=403, detail="Operator role required")
+    db = SessionLocal()
+    try:
+        job = db.query(CronJobModel).filter(CronJobModel.id == job_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail="Cron job not found")
+        if not check_vps_access(user, job.vps_id):
+            raise HTTPException(status_code=403, detail="Access denied")
+        if data.name is not None:
+            job.name = data.name
+        if data.schedule is not None:
+            job.schedule = data.schedule
+        if data.command is not None:
+            job.command = data.command
+        if data.description is not None:
+            job.description = data.description
+        if data.enabled is not None:
+            job.enabled = data.enabled
+        job.updated_at = time.time()
+        db.commit()
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        db.close()
+
+
+@app.delete("/api/cron-jobs/{job_id}")
+async def delete_cron_job(job_id: str, request: Request):
+    """Delete a stored cron job. operator+ only."""
+    user = get_current_user(request)
+    if not role_has_access(user["role"], "operator"):
+        raise HTTPException(status_code=403, detail="Operator role required")
+    db = SessionLocal()
+    try:
+        job = db.query(CronJobModel).filter(CronJobModel.id == job_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail="Cron job not found")
+        if not check_vps_access(user, job.vps_id):
+            raise HTTPException(status_code=403, detail="Access denied")
+        db.delete(job)
+        db.commit()
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        db.close()
+
+
+# ═══════════════════════════════════════════════════════════════
+#  NETWORK DIAGNOSTICS
+# ═══════════════════════════════════════════════════════════════
+
+class NetworkPingBody(BaseModel):
+    target: str
+    count: int = 4
+
+
+class NetworkTracerouteBody(BaseModel):
+    target: str
+
+
+class NetworkDNSBody(BaseModel):
+    domain: str
+    record_type: str = "A"
+
+
+class NetworkPortCheckBody(BaseModel):
+    target: str
+    port: int
+    protocol: str = "tcp"
+
+
+@app.post("/api/vps/{vps_id}/network/ping")
+async def network_ping(vps_id: str, body: NetworkPingBody, request: Request):
+    """Ping from VPS. operator+ only."""
+    user = get_current_user(request)
+    if not role_has_access(user["role"], "operator"):
+        raise HTTPException(status_code=403, detail="Operator role required")
+    vps = get_vps_and_check_access(vps_id, user)
+    return manager.network_ping(vps, body.target, body.count)
+
+
+@app.post("/api/vps/{vps_id}/network/traceroute")
+async def network_traceroute(vps_id: str, body: NetworkTracerouteBody, request: Request):
+    """Traceroute from VPS. operator+ only."""
+    user = get_current_user(request)
+    if not role_has_access(user["role"], "operator"):
+        raise HTTPException(status_code=403, detail="Operator role required")
+    vps = get_vps_and_check_access(vps_id, user)
+    return manager.network_traceroute(vps, body.target)
+
+
+@app.post("/api/vps/{vps_id}/network/dns")
+async def network_dns(vps_id: str, body: NetworkDNSBody, request: Request):
+    """DNS lookup from VPS. operator+ only."""
+    user = get_current_user(request)
+    if not role_has_access(user["role"], "operator"):
+        raise HTTPException(status_code=403, detail="Operator role required")
+    vps = get_vps_and_check_access(vps_id, user)
+    return manager.network_dns_lookup(vps, body.domain, body.record_type)
+
+
+@app.post("/api/vps/{vps_id}/network/port-check")
+async def network_port_check(vps_id: str, body: NetworkPortCheckBody, request: Request):
+    """Check port from VPS. operator+ only."""
+    user = get_current_user(request)
+    if not role_has_access(user["role"], "operator"):
+        raise HTTPException(status_code=403, detail="Operator role required")
+    vps = get_vps_and_check_access(vps_id, user)
+    return manager.network_port_check(vps, body.target, body.port, body.protocol)
 
 
 # ═══════════════════════════════════════════════════════════════

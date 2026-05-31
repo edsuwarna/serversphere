@@ -2481,3 +2481,416 @@ pre {
 .script-empty .btn {
   margin-top: 8px;
 }
+
+/* ═══ Compose Page ═══ */
+.compose-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.compose-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  transition: border-color 0.2s;
+}
+
+.compose-card:hover {
+  border-color: var(--amber-600);
+}
+
+.compose-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.compose-card-project {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.compose-card-path {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compose-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.compose-card-actions .btn {
+  font-size: 12px;
+  padding: 4px 10px;
+  min-height: unset;
+}
+
+.compose-services-table {
+  margin-top: 20px;
+}
+
+.compose-service-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+}
+
+.compose-service-status.running {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--emerald-400);
+}
+
+.compose-service-status.stopped {
+  background: rgba(244, 63, 94, 0.12);
+  color: var(--rose-500);
+}
+
+.compose-service-status.paused {
+  background: rgba(234, 179, 8, 0.12);
+  color: var(--amber-400);
+}
+
+/* ═══ Cron Page ═══ */
+.cron-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  background: var(--bg-elevated);
+  padding: 4px;
+  border-radius: var(--radius);
+  width: fit-content;
+}
+
+.cron-tab {
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.15s;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+}
+
+.cron-tab.active {
+  background: var(--primary);
+  color: #fff;
+}
+
+.cron-editor {
+  margin-top: 12px;
+}
+
+.cron-editor textarea {
+  width: 100%;
+  min-height: 200px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  resize: vertical;
+}
+
+.cron-editor-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cron-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.cron-status-badge.enabled {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--emerald-400);
+}
+
+.cron-status-badge.disabled {
+  background: rgba(244, 63, 94, 0.12);
+  color: var(--rose-500);
+}
+
+/* ═══ Network Tools ═══ */
+.network-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.network-tool-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.network-tool-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.network-tool-header:hover {
+  background: var(--bg-hover);
+}
+
+.network-tool-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.network-tool-icon {
+  font-size: 20px;
+}
+
+.network-tool-body {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.network-tool-body.hidden {
+  display: none;
+}
+
+.network-tool-inputs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.network-tool-inputs .form-group {
+  margin-bottom: 0;
+  flex: 1;
+  min-width: 120px;
+}
+
+.network-tool-inputs .form-group label {
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+
+.network-tool-inputs .form-group input,
+.network-tool-inputs .form-group select {
+  font-size: 13px;
+  padding: 6px 10px;
+}
+
+.network-result {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  max-height: 300px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  color: var(--text);
+  margin-top: 8px;
+}
+
+.network-result.success {
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.network-result.error {
+  border-color: rgba(244, 63, 94, 0.3);
+}
+
+.network-result .hop-line {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 12px;
+}
+
+.network-result .hop-num {
+  color: var(--text-muted);
+  min-width: 24px;
+}
+
+/* ═══ Settings Page ═══ */
+.settings-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.settings-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.settings-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.settings-card-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.totp-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+}
+
+.totp-status.enabled {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--emerald-400);
+}
+
+.totp-status.disabled {
+  background: rgba(244, 63, 94, 0.12);
+  color: var(--rose-500);
+}
+
+/* ═══ TOTP Modal ═══ */
+.totp-setup-content {
+  text-align: center;
+  padding: 8px 0;
+}
+
+.totp-qr-container {
+  display: inline-block;
+  background: #fff;
+  padding: 12px;
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+}
+
+.totp-qr-container img {
+  display: block;
+  width: 180px;
+  height: 180px;
+}
+
+.totp-secret-display {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--amber-400);
+  background: var(--bg-elevated);
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  display: inline-block;
+  margin-bottom: 12px;
+  letter-spacing: 2px;
+}
+
+.totp-instruction {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.totp-code-input {
+  max-width: 200px;
+  margin: 0 auto;
+  text-align: center;
+  font-size: 24px !important;
+  letter-spacing: 8px;
+}
+
+/* ═══ VPS Selector Bar ═══ */
+.vps-selector-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.vps-selector-bar label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.vps-selector-bar select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 13px;
+  min-width: 200px;
+  max-width: 300px;
+}
+
+/* ═══ TOTP Login Prompt ═══ */
+.totp-login-modal .modal-content {
+  max-width: 380px;
+  text-align: center;
+}
+
+.totp-login-modal .modal-title {
+  margin-bottom: 8px;
+}
+
+.totp-login-modal p {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}

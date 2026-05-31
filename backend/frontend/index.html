@@ -85,6 +85,18 @@
                     <span class="material-icons nav-icon">dns</span>
                     <span class="nav-label">Instances</span>
                 </a>
+                <a href="#" class="nav-item" data-page="compose" onclick="showPage('compose')">
+                    <span class="material-icons nav-icon">layers</span>
+                    <span class="nav-label">Docker Compose</span>
+                </a>
+                <a href="#" class="nav-item" data-page="cron" onclick="showPage('cron')">
+                    <span class="material-icons nav-icon">schedule</span>
+                    <span class="nav-label">Cron Jobs</span>
+                </a>
+                <a href="#" class="nav-item" data-page="network" onclick="showPage('network')">
+                    <span class="material-icons nav-icon">wifi</span>
+                    <span class="nav-label">Network Tools</span>
+                </a>
                 <a href="#" id="navMonitoring" class="nav-item" data-page="monitoring" onclick="showPage('monitoring')" style="display:none">
                     <span class="material-icons nav-icon">monitoring</span>
                     <span class="nav-label">Monitoring</span>
@@ -122,6 +134,10 @@
                 <a href="#" id="navScripts" class="nav-item" data-page="scripts" onclick="showPage('scripts')">
                     <span class="material-icons nav-icon">code</span>
                     <span class="nav-label">Scripts</span>
+                </a>
+                <a href="#" class="nav-item" data-page="settings" onclick="showPage('settings')">
+                    <span class="material-icons nav-icon">settings</span>
+                    <span class="nav-label">Settings</span>
                 </a>
             </nav>
 
@@ -855,6 +871,350 @@
                     </div>
                 </div>
 
+
+                <!-- ═══ Docker Compose Page ═══ -->
+                <div id="page-compose" class="page">
+                    <div class="page-header">
+                        <h2>Docker Compose</h2>
+                        <button class="btn btn-primary" onclick="refreshCompose()">
+                            <span class="material-icons" style="font-size:16px">refresh</span> Refresh
+                        </button>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:16px;max-width:320px;">
+                        <label for="composeVPS">VPS Instance</label>
+                        <select id="composeVPS" onchange="onComposeVPSChange()">
+                            <option value="">-- Select VPS --</option>
+                        </select>
+                    </div>
+
+                    <!-- Compose Files List -->
+                    <div id="composeFilesList" style="margin-bottom:20px;">
+                        <div class="empty-state" id="composeEmptyState">
+                            <span class="material-icons empty-icon" style="font-size:48px;color:var(--text-muted)">layers</span>
+                            <p style="color:var(--text-muted);">Select a VPS to view Docker Compose files.</p>
+                        </div>
+                        <div id="composeFilesCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">
+                            <!-- Compose file cards rendered dynamically by JS -->
+                        </div>
+                        <!-- Template for compose file cards -->
+                        <div id="composeCardTemplate" style="display:none;">
+                            <div class="card compose-file-card" data-project="">
+                                <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <span class="material-icons" style="font-size:18px;color:var(--primary)">layers</span>
+                                        <h4 class="compose-project-name" style="margin:0;font-size:14px;font-weight:600;"></h4>
+                                    </div>
+                                    <span class="compose-status-indicator" style="display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:2px 8px;border-radius:10px;"></span>
+                                </div>
+                                <div class="card-body" style="padding:8px 16px 12px;">
+                                    <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">
+                                        <span class="material-icons" style="font-size:14px;vertical-align:middle;margin-right:4px;">folder</span>
+                                        <span class="compose-file-path"></span>
+                                    </div>
+                                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                                        <button class="btn btn-sm btn-primary" onclick="composeAction(this, 'up')">
+                                            <span class="material-icons" style="font-size:14px">play_arrow</span> Up
+                                        </button>
+                                        <button class="btn btn-sm" onclick="composeAction(this, 'down')" style="background:var(--danger);color:#fff;">
+                                            <span class="material-icons" style="font-size:14px">stop</span> Down
+                                        </button>
+                                        <button class="btn btn-sm" onclick="composeAction(this, 'restart')">
+                                            <span class="material-icons" style="font-size:14px">replay</span> Restart
+                                        </button>
+                                        <button class="btn btn-sm btn-ghost" onclick="composeAction(this, 'pull')">
+                                            <span class="material-icons" style="font-size:14px">download</span> Pull
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Compose Services Table -->
+                    <div class="card" style="padding:0;overflow:hidden;">
+                        <div class="card-header" style="padding:12px 16px;">
+                            <span class="material-icons" style="font-size:18px;margin-right:8px">view_in_ar</span>
+                            <h3 style="margin:0;font-size:14px;font-weight:600;">Services</h3>
+                        </div>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Status</th>
+                                        <th>Image</th>
+                                        <th>Ports</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="composeServicesBody">
+                                    <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px;">Select a VPS and compose file to view services.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ Cron Jobs Page ═══ -->
+                <div id="page-cron" class="page">
+                    <div class="page-header">
+                        <h2>Cron Jobs</h2>
+                        <div style="display:flex;gap:8px;">
+                            <button class="btn btn-primary" onclick="refreshCronJobs()">
+                                <span class="material-icons" style="font-size:16px">refresh</span> Refresh
+                            </button>
+                            <button class="btn btn-primary" onclick="showAddCronJob()">
+                                <span class="material-icons" style="font-size:18px">add</span> Add Cron Job
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:16px;max-width:320px;">
+                        <label for="cronVPS">VPS Instance</label>
+                        <select id="cronVPS" onchange="onCronVPSChange()">
+                            <option value="">-- Select VPS --</option>
+                        </select>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="tabs" style="margin-bottom:16px;">
+                        <button class="tab active" data-tab="vps-crontab" onclick="switchCronTab('vps-crontab')">
+                            <span class="material-icons" style="font-size:16px;margin-right:4px">schedule</span> VPS Crontab
+                        </button>
+                        <button class="tab" data-tab="stored-jobs" onclick="switchCronTab('stored-jobs')">
+                            <span class="material-icons" style="font-size:16px;margin-right:4px">storage</span> Stored Jobs
+                        </button>
+                    </div>
+
+                    <!-- VPS Crontab Tab -->
+                    <div id="cron-tab-vps-crontab" class="tab-content active">
+                        <div class="card">
+                            <div class="card-header">
+                                <span class="material-icons" style="font-size:18px;margin-right:8px">schedule</span>
+                                <h3>System Crontab</h3>
+                            </div>
+                            <div class="card-body">
+                                <textarea id="crontabEditor" rows="12" style="width:100%;padding:10px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;resize:vertical;tab-size:2;" placeholder="# Edit crontab here...&#10;* * * * * /usr/bin/example.sh" readonly></textarea>
+                                <div style="display:flex;gap:8px;margin-top:12px;">
+                                    <button class="btn btn-primary" id="crontabEditBtn" onclick="editCrontab()">
+                                        <span class="material-icons" style="font-size:16px">edit</span> Edit
+                                    </button>
+                                    <button class="btn btn-primary" id="crontabSaveBtn" onclick="saveCrontab()" style="display:none;">
+                                        <span class="material-icons" style="font-size:16px">save</span> Save
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stored Jobs Tab -->
+                    <div id="cron-tab-stored-jobs" class="tab-content" style="display:none;">
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Schedule</th>
+                                        <th>Command</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="storedJobsBody">
+                                    <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px;">No stored jobs. Click "Add Cron Job" to create one.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ Network Tools Page ═══ -->
+                <div id="page-network" class="page">
+                    <div class="page-header">
+                        <h2>Network Tools</h2>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:16px;max-width:320px;">
+                        <label for="networkVPS">VPS Instance</label>
+                        <select id="networkVPS" onchange="onNetworkVPSChange()">
+                            <option value="">-- Select VPS --</option>
+                        </select>
+                    </div>
+
+                    <!-- Ping Tool -->
+                    <div class="card" style="margin-bottom:12px;">
+                        <div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleCollapsible('networkPingBody')">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span class="material-icons" style="font-size:18px;color:var(--text-muted)">cell_tower</span>
+                                <span style="font-weight:500;">Ping</span>
+                            </div>
+                            <span class="material-icons" id="networkPingIcon" style="font-size:20px;color:var(--text-muted);transition:transform 0.2s;">expand_more</span>
+                        </div>
+                        <div id="networkPingBody" style="padding:0 16px 16px;display:block;">
+                            <div class="form-row" style="gap:8px;">
+                                <div class="form-group" style="flex:1;">
+                                    <label>Target</label>
+                                    <input type="text" id="pingTarget" placeholder="google.com or 8.8.8.8">
+                                </div>
+                                <div class="form-group" style="width:100px;">
+                                    <label>Count</label>
+                                    <select id="pingCount">
+                                        <option value="1">1</option>
+                                        <option value="3" selected>3</option>
+                                        <option value="5">5</option>
+                                        <option value="10">10</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" onclick="runPing()">
+                                <span class="material-icons" style="font-size:16px">play_arrow</span> Run Ping
+                            </button>
+                            <pre id="pingResults" class="code-block" style="margin-top:12px;max-height:200px;overflow-y:auto;display:none;"></pre>
+                        </div>
+                    </div>
+
+                    <!-- Traceroute Tool -->
+                    <div class="card" style="margin-bottom:12px;">
+                        <div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleCollapsible('networkTracerouteBody')">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span class="material-icons" style="font-size:18px;color:var(--text-muted)">alt_route</span>
+                                <span style="font-weight:500;">Traceroute</span>
+                            </div>
+                            <span class="material-icons" id="networkTracerouteIcon" style="font-size:20px;color:var(--text-muted);transition:transform 0.2s;">expand_more</span>
+                        </div>
+                        <div id="networkTracerouteBody" style="padding:0 16px 16px;display:none;">
+                            <div class="form-group">
+                                <label>Target</label>
+                                <input type="text" id="tracerouteTarget" placeholder="google.com or 8.8.8.8">
+                            </div>
+                            <button class="btn btn-primary" onclick="runTraceroute()">
+                                <span class="material-icons" style="font-size:16px">play_arrow</span> Run Traceroute
+                            </button>
+                            <pre id="tracerouteResults" class="code-block" style="margin-top:12px;max-height:300px;overflow-y:auto;display:none;"></pre>
+                        </div>
+                    </div>
+
+                    <!-- DNS Lookup Tool -->
+                    <div class="card" style="margin-bottom:12px;">
+                        <div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleCollapsible('networkDnsBody')">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span class="material-icons" style="font-size:18px;color:var(--text-muted)">dns</span>
+                                <span style="font-weight:500;">DNS Lookup</span>
+                            </div>
+                            <span class="material-icons" id="networkDnsIcon" style="font-size:20px;color:var(--text-muted);transition:transform 0.2s;">expand_more</span>
+                        </div>
+                        <div id="networkDnsBody" style="padding:0 16px 16px;display:none;">
+                            <div class="form-row" style="gap:8px;">
+                                <div class="form-group" style="flex:1;">
+                                    <label>Domain</label>
+                                    <input type="text" id="dnsDomain" placeholder="example.com">
+                                </div>
+                                <div class="form-group" style="width:140px;">
+                                    <label>Record Type</label>
+                                    <select id="dnsRecordType">
+                                        <option value="A">A</option>
+                                        <option value="AAAA">AAAA</option>
+                                        <option value="CNAME">CNAME</option>
+                                        <option value="MX">MX</option>
+                                        <option value="TXT">TXT</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" onclick="runDnsLookup()">
+                                <span class="material-icons" style="font-size:16px">play_arrow</span> DNS Lookup
+                            </button>
+                            <pre id="dnsResults" class="code-block" style="margin-top:12px;max-height:300px;overflow-y:auto;display:none;"></pre>
+                        </div>
+                    </div>
+
+                    <!-- Port Check Tool -->
+                    <div class="card" style="margin-bottom:12px;">
+                        <div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleCollapsible('networkPortBody')">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span class="material-icons" style="font-size:18px;color:var(--text-muted)">router</span>
+                                <span style="font-weight:500;">Port Check</span>
+                            </div>
+                            <span class="material-icons" id="networkPortIcon" style="font-size:20px;color:var(--text-muted);transition:transform 0.2s;">expand_more</span>
+                        </div>
+                        <div id="networkPortBody" style="padding:0 16px 16px;display:none;">
+                            <div class="form-row" style="gap:8px;">
+                                <div class="form-group" style="flex:1;">
+                                    <label>Target</label>
+                                    <input type="text" id="portCheckTarget" placeholder="example.com or 8.8.8.8">
+                                </div>
+                                <div class="form-group" style="width:100px;">
+                                    <label>Port</label>
+                                    <input type="number" id="portCheckPort" placeholder="80" min="1" max="65535">
+                                </div>
+                                <div class="form-group" style="width:100px;">
+                                    <label>Protocol</label>
+                                    <select id="portCheckProtocol">
+                                        <option value="tcp">TCP</option>
+                                        <option value="udp">UDP</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" onclick="runPortCheck()">
+                                <span class="material-icons" style="font-size:16px">play_arrow</span> Check
+                            </button>
+                            <div id="portCheckResult" style="margin-top:12px;display:none;padding:12px 16px;border-radius:6px;font-weight:500;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ Settings Page ═══ -->
+                <div id="page-settings" class="page">
+                    <div class="page-header">
+                        <h2>Account Settings</h2>
+                    </div>
+
+                    <!-- TOTP Section -->
+                    <div class="card" style="margin-bottom:16px;">
+                        <div class="card-header">
+                            <span class="material-icons" style="font-size:18px;margin-right:8px">security</span>
+                            <h3>Two-Factor Authentication (TOTP)</h3>
+                        </div>
+                        <div class="card-body">
+                            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                                <div>
+                                    <span style="font-size:13px;color:var(--text-muted);">Status:</span>
+                                    <span id="totpStatus" style="font-weight:600;margin-left:4px;color:var(--text-muted);">Checking...</span>
+                                </div>
+                                <button class="btn btn-primary" id="totpSetupBtn" onclick="setupTOTP()" style="display:none;">
+                                    <span class="material-icons" style="font-size:16px">lock</span> Setup TOTP
+                                </button>
+                                <button class="btn btn-danger" id="totpDisableBtn" onclick="disableTOTP()" style="display:none;">
+                                    <span class="material-icons" style="font-size:16px">lock_open</span> Disable
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User Info -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="material-icons" style="font-size:18px;margin-right:8px">person</span>
+                            <h3>User Information</h3>
+                        </div>
+                        <div class="card-body">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Username</label>
+                                    <span id="settingsUsername" style="font-size:14px;font-weight:500;">-</span>
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Role</label>
+                                    <span id="settingsRole" style="font-size:14px;font-weight:500;">-</span>
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Display Name</label>
+                                    <span id="settingsDisplayName" style="font-size:14px;font-weight:500;">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
 </main>
         </div>
@@ -1765,6 +2125,101 @@
 
     <!-- Hidden file input for script import -->
     <input type="file" id="scriptImportInput" accept=".json" style="display:none" onchange="onScriptImportFile(event)">
+
+    <!-- ═══ TOTP Setup Modal ═══ -->
+    <div id="totpSetupModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeTOTPModal()"></div>
+        <div class="modal-card" style="max-width:420px;">
+            <div class="modal-header">
+                <h3>Setup Two-Factor Authentication</h3>
+                <button class="modal-close" onclick="closeTOTPModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div style="padding:16px 24px;text-align:center;">
+                <div style="margin-bottom:16px;">
+                    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Scan this QR code with your authenticator app:</p>
+                    <img id="totpQrCode" src="" alt="TOTP QR Code" style="width:180px;height:180px;border:2px solid var(--border);border-radius:8px;background:#fff;padding:8px;">
+                </div>
+                <div style="margin-bottom:16px;">
+                    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Secret Key</label>
+                    <code id="totpSecret" style="font-size:12px;word-break:break-all;padding:8px;background:var(--tertiary);border-radius:4px;display:inline-block;"></code>
+                </div>
+                <div class="form-group">
+                    <label for="totpCode">Verification Code</label>
+                    <input type="text" id="totpCode" placeholder="Enter 6-digit code" maxlength="6" style="text-align:center;font-size:18px;letter-spacing:4px;font-family:var(--mono);">
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content:center;">
+                <button type="button" class="btn btn-primary" onclick="verifyTOTP()">
+                    <span class="material-icons" style="font-size:16px">check_circle</span> Verify
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeTOTPModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Compose Action Confirmation Modal ═══ -->
+    <div id="composeActionModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeComposeActionModal()"></div>
+        <div class="modal-card" style="max-width:420px;">
+            <div class="modal-header">
+                <h3>Confirm Compose Action</h3>
+                <button class="modal-close" onclick="closeComposeActionModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div style="padding:16px 24px;text-align:center;">
+                <span class="material-icons" style="font-size:48px;color:var(--warning);margin-bottom:12px;">warning_amber</span>
+                <p id="composeActionMessage" style="font-size:14px;color:var(--text);"></p>
+            </div>
+            <div class="modal-footer" style="justify-content:center;gap:12px;">
+                <button type="button" class="btn btn-primary" id="composeActionConfirmBtn" onclick="confirmComposeAction()">
+                    <span class="material-icons" style="font-size:16px">check</span> Confirm
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeComposeActionModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Cron Job Edit Modal ═══ -->
+    <div id="cronEditModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeCronEditModal()"></div>
+        <div class="modal-card" style="max-width:540px;">
+            <div class="modal-header">
+                <h3 id="cronEditModalTitle">Add Cron Job</h3>
+                <button class="modal-close" onclick="closeCronEditModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <input type="hidden" id="cronEditId">
+            <div style="padding:16px 24px;">
+                <div class="form-group">
+                    <label for="cronEditName">Name</label>
+                    <input type="text" id="cronEditName" placeholder="e.g. Daily Backup">
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label for="cronEditSchedule">Schedule (Cron Expression)</label>
+                    <input type="text" id="cronEditSchedule" placeholder="*/5 * * * *" style="font-family:var(--mono);">
+                    <small style="color:var(--text-muted);font-size:11px;margin-top:4px;display:block;">Format: minute hour day month weekday</small>
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label for="cronEditCommand">Command</label>
+                    <textarea id="cronEditCommand" rows="4" placeholder="/usr/bin/backup.sh" style="width:100%;padding:10px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;resize:vertical;"></textarea>
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label for="cronEditDescription">Description</label>
+                    <textarea id="cronEditDescription" rows="2" placeholder="Optional description..." style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px;outline:none;resize:vertical;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeCronEditModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveCronJob()">
+                    <span class="material-icons" style="font-size:16px">save</span> Save
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- ═══ Toast Container ═══ -->
     <div id="toastContainer"></div>
