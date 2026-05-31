@@ -25,6 +25,24 @@ docker compose up -d
 
 Open `http://your-server:8080` and you're in.
 
+## Container images
+
+Available on [GitHub Container Registry](https://github.com/users/edsuwarna/packages/container/package/serversphere).
+
+```yaml
+image: ghcr.io/edsuwarna/serversphere:TAG
+```
+
+| Tag | Points to | Pushed by | When to use |
+|-----|-----------|-----------|-------------|
+| `latest` | Latest stable release | Release workflow | Production — you want the most recent stable version |
+| `stable` | Same as `latest` | Release workflow | Production — explicit alias for `latest` |
+| `0.1.0` | This exact release | Release workflow | Pin to a specific version |
+| `edge` | Latest commit on `main` | Main-build workflow | Testing / staging — bleeding edge |
+| `sha-xxxxxxx` | A specific commit | Main-build workflow | Rollback / debugging |
+
+> **💡 Pro-tip:** Use `ghcr.io/edsuwarna/serversphere:stable` in production. It always points to the latest tagged release and won't be overwritten by main-branch builds.
+
 ## For who?
 
 | You | Why ServerSphere |
