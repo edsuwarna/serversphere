@@ -1605,6 +1605,12 @@
             <div style="padding:16px 24px;">
                 <div style="margin-bottom:16px;">
                     <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:8px;">Target VPS</label>
+                    <div style="margin-bottom:6px;">
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+                            <input type="checkbox" id="scriptSelectAll" onchange="toggleScriptSelectAll()" checked style="width:16px;height:16px;accent-color:var(--primary);">
+                            <span>Select All</span>
+                        </label>
+                    </div>
                     <div id="scriptVpsList" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px;">
                         <!-- VPS checklist items will be rendered here by JS -->
                         <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Loading VPS list...</div>
@@ -1620,8 +1626,8 @@
                         <select id="scriptRunTimeout"
                             style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px;">
                             <option value="10">10 seconds</option>
-                            <option value="30" selected>30 seconds</option>
-                            <option value="60">60 seconds</option>
+                            <option value="30">30 seconds</option>
+                            <option value="60" selected>60 seconds</option>
                             <option value="120">120 seconds</option>
                             <option value="300">5 minutes</option>
                         </select>

@@ -3662,8 +3662,8 @@ async function duplicateScript(scriptId) {
 
 async function openScriptRun(scriptId) {
     const modal = document.getElementById('scriptRunModal');
-    const titleEl = document.getElementById('scriptRunTitle');
-    const vpsChecklist = document.getElementById('scriptRunVpsList');
+    const titleEl = document.getElementById('scriptRunName');
+    const vpsChecklist = document.getElementById('scriptVpsList');
 
     // Fetch script details
     let script;
