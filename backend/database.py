@@ -152,6 +152,42 @@ class PersistentSession(Base):
     user_agent = Column(String(512), nullable=True)
 
 
+class Script(Base):
+    """Saved scripts/commands that can be run on VPS."""
+    __tablename__ = "scripts"
+
+    id = Column(String(32), primary_key=True)
+    name = Column(String(256), nullable=False)
+    description = Column(Text, default="")
+    category = Column(String(64), default="Custom")  # System, Docker, Database, Security, Monitoring, Custom
+    command = Column(Text, nullable=False)
+    run_as = Column(String(32), default="current_user")  # root, sudo, current_user
+    requires_root = Column(Boolean, default=False)
+    timeout = Column(Integer, default=300)
+    created_by = Column(String(32), ForeignKey("users.id"), nullable=True)
+    created_at = Column(Float, default=time.time)
+    updated_at = Column(Float, default=time.time, onupdate=time.time)
+
+
+class ScriptRun(Base):
+    """Execution history of scripts on VPS."""
+    __tablename__ = "script_runs"
+
+    id = Column(String(32), primary_key=True)
+    script_id = Column(String(32), ForeignKey("scripts.id", ondelete="SET NULL"), nullable=True)
+    script_name = Column(String(256), nullable=False)
+    vps_id = Column(String(32), ForeignKey("vps.id"), nullable=False)
+    vps_name = Column(String(256), nullable=False)
+    status = Column(String(32), default="running")  # running, success, failed, timeout
+    output = Column(Text, default="")
+    error = Column(Text, default="")
+    exit_code = Column(Integer, nullable=True)
+    started_at = Column(Float, default=time.time)
+    finished_at = Column(Float, nullable=True)
+    triggered_by = Column(String(128), default="manual")  # manual, schedule, system
+    exec_time_ms = Column(Integer, nullable=True)
+
+
 # ─── Helpers ─────────────────────────────────────────────────
 
 def init_db():

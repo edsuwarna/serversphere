@@ -119,6 +119,10 @@
                     <span class="material-icons nav-icon">rocket_launch</span>
                     <span class="nav-label">GitHub Actions</span>
                 </a>
+                <a href="#" id="navScripts" class="nav-item" data-page="scripts" onclick="showPage('scripts')">
+                    <span class="material-icons nav-icon">code</span>
+                    <span class="nav-label">Scripts</span>
+                </a>
             </nav>
 
             <div class="sidebar-footer">
@@ -744,6 +748,77 @@
                             </div>
                             <pre class="cmd-output" id="quickCmdOutput">Output will appear here...</pre>
                         </div>
+                    </div>
+                </div>
+
+                <!-- ═══ Script Library Page ═══ -->
+                <div id="page-scripts" class="page">
+                    <div class="page-header">
+                        <h2>Script Library</h2>
+                        <button class="btn btn-primary" onclick="openScriptForm()">
+                            <span class="material-icons" style="font-size:18px">add</span> New Script
+                        </button>
+                    </div>
+                    <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;">
+                        Create and manage reusable scripts to run across your VPS instances.
+                    </p>
+
+                    <!-- Filter Bar -->
+                    <div class="filter-bar" style="display:flex;gap:12px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
+                        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:200px;">
+                            <span class="material-icons" style="font-size:18px;color:var(--text-muted);">search</span>
+                            <input type="text" id="scriptSearchInput" placeholder="Search scripts..."
+                                style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text);font-size:13px;outline:none;" oninput="filterScripts()">
+                        </div>
+                        <select id="scriptCategoryFilter" onchange="filterScripts()"
+                            style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text);font-size:13px;min-width:140px;">
+                            <option value="">All Categories</option>
+                            <option value="System">System</option>
+                            <option value="Docker">Docker</option>
+                            <option value="Database">Database</option>
+                            <option value="Security">Security</option>
+                            <option value="Monitoring">Monitoring</option>
+                            <option value="Custom">Custom</option>
+                        </select>
+                        <select id="scriptSortFilter" onchange="filterScripts()"
+                            style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text);font-size:13px;min-width:140px;">
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="name">Name</option>
+                            <option value="runs">Most Runs</option>
+                        </select>
+                    </div>
+
+                    <!-- Card Grid -->
+                    <div id="scriptGrid" class="card-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-bottom:24px;">
+                        <div class="empty-state" style="grid-column:1/-1;">
+                            <span class="material-icons empty-icon" style="font-size:48px;color:var(--text-muted);">code</span>
+                            <p style="color:var(--text-muted);">No scripts yet. Create your first script to get started.</p>
+                        </div>
+                    </div>
+
+                    <!-- Recent Runs -->
+                    <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                        <h3 style="margin:0;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px;">
+                            <span class="material-icons" style="font-size:18px;color:var(--text-muted);">history</span> Recent Runs
+                        </h3>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Script</th>
+                                    <th>VPS</th>
+                                    <th>Status</th>
+                                    <th>Started</th>
+                                    <th>Duration</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scriptRecentRuns">
+                                <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No runs yet</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -1432,6 +1507,128 @@
             <div class="modal-footer" style="justify-content:space-between;">
                 <span id="bulkResultsTime" style="font-size:12px;color:var(--text-muted);"></span>
                 <button type="button" class="btn btn-secondary" onclick="closeBulkResultsModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Script Form Modal ═══ -->
+    <div id="scriptFormModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeScriptForm()"></div>
+        <div class="modal-card" style="max-width:600px;">
+            <div class="modal-header">
+                <h3 id="scriptFormModalTitle">New Script</h3>
+                <button class="modal-close" onclick="closeScriptForm()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <input type="hidden" id="scriptFormId">
+            <div style="padding:16px 24px;">
+                <div class="form-group">
+                    <label>Script Name *</label>
+                    <input type="text" id="scriptFormName" placeholder="e.g. Docker System Prune">
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label>Description</label>
+                    <textarea id="scriptFormDescription" rows="2" placeholder="Brief description of what this script does..."
+                        style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:var(--font);"></textarea>
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label>Category</label>
+                    <select id="scriptFormCategory"
+                        style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px;">
+                        <option value="System">System</option>
+                        <option value="Docker">Docker</option>
+                        <option value="Database">Database</option>
+                        <option value="Security">Security</option>
+                        <option value="Monitoring">Monitoring</option>
+                        <option value="Custom">Custom</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label>Command *</label>
+                    <textarea id="scriptFormCommand" rows="6" placeholder="#! /bin/bash&#10;echo 'Hello, World!'"
+                        style="width:100%;padding:10px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;resize:vertical;tab-size:2;"></textarea>
+                </div>
+                <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;">
+                    <div class="form-group" style="flex:1;min-width:140px;">
+                        <label>Run As</label>
+                        <select id="scriptFormRunAs"
+                            style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px;">
+                            <option value="root">root</option>
+                            <option value="sudo">sudo</option>
+                            <option value="current_user">current user</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex:1;min-width:140px;">
+                        <label>Timeout</label>
+                        <select id="scriptFormTimeout"
+                            style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px;">
+                            <option value="10">10 seconds</option>
+                            <option value="30" selected>30 seconds</option>
+                            <option value="60">60 seconds</option>
+                            <option value="120">120 seconds</option>
+                            <option value="300">5 minutes</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="checkbox" id="scriptFormRequiresRoot" style="width:16px;height:16px;accent-color:var(--primary);">
+                        <span>Requires root privileges</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeScriptForm()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveScript()">
+                    <span class="material-icons" style="font-size:16px;">save</span> Save Script
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Run Script Modal ═══ -->
+    <div id="scriptRunModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeScriptRunModal()"></div>
+        <div class="modal-card" style="max-width:600px;">
+            <div class="modal-header">
+                <h3>Run Script: <span id="scriptRunName" style="font-family:var(--mono);font-size:14px;"></span></h3>
+                <button class="modal-close" onclick="closeScriptRunModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <input type="hidden" id="scriptRunId">
+            <div style="padding:16px 24px;">
+                <div style="margin-bottom:16px;">
+                    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:8px;">Target VPS</label>
+                    <div id="scriptVpsList" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px;">
+                        <!-- VPS checklist items will be rendered here by JS -->
+                        <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Loading VPS list...</div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+                        <input type="checkbox" id="scriptRunParallel" style="width:16px;height:16px;accent-color:var(--primary);">
+                        <span>Run in parallel</span>
+                    </label>
+                    <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+                        <label style="font-size:13px;white-space:nowrap;">Timeout</label>
+                        <select id="scriptRunTimeout"
+                            style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px;">
+                            <option value="10">10 seconds</option>
+                            <option value="30" selected>30 seconds</option>
+                            <option value="60">60 seconds</option>
+                            <option value="120">120 seconds</option>
+                            <option value="300">5 minutes</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeScriptRunModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="executeScriptRun()">
+                    <span class="material-icons" style="font-size:16px;">play_arrow</span> Run Script
+                </button>
             </div>
         </div>
     </div>
