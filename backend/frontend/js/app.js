@@ -162,6 +162,7 @@ function showApp() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     showPage('dashboard');
+    setTimeout(initRefreshHandler, 100);
 }
 
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
@@ -250,6 +251,7 @@ function showPage(page) {
         'ssh-keys': 'SSH Keys',
         'groups': 'Groups',
         'github': 'GitHub Actions',
+        'scripts': 'Script Library',
     };
     const pageTitleEl = document.getElementById('pageTitle');
     if (pageTitleEl && pageTitles[page]) {
@@ -275,6 +277,7 @@ function showPage(page) {
     if (page === 'ssh-keys') loadSSHKeys();
     if (page === 'groups') loadGroups();
     if (page === 'github') loadGitHubActions();
+    if (page === 'scripts') { loadScripts(); loadScriptRuns(); }
 }
 
 // ─── Dashboard ──────────────────────────────────────────────
@@ -3269,6 +3272,1028 @@ document.addEventListener('click', function(e) {
     closeMobileSidebar();
   }
 });
+
+// ─── Script Library ─────────────────────────────────────────
+// ─── Helper Functions ──────────────────────────────────────
+
+function getScriptCategoryIcon(category) {
+    const icons = {
+        'System': 'terminal',
+        'Docker': 'inventory_2',
+        'Database': 'storage',
+        'Security': 'lock',
+        'Monitoring': 'monitor_heart',
+        'Custom': 'code',
+    };
+    return icons[category] || 'code';
+}
+
+function getScriptCategoryClass(category) {
+    const classes = {
+        'System': 'warning',
+        'Docker': 'info',
+        'Database': 'warning',
+        'Security': 'danger',
+        'Monitoring': 'info',
+        'Custom': '',
+    };
+    return classes[category] || '';
+}
+
+// ─── Category helpers ──────────────────────────────────────
+
+async function loadCategories() {
+    try {
+        const res = await api('GET', '/scripts/categories');
+        return res.categories || [];
+    } catch (err) {
+        console.error('Failed to load categories:', err);
+        return ['System', 'Docker', 'Database', 'Security', 'Monitoring', 'Custom'];
+    }
+}
+
+function populateCategoryDropdown(selectEl, selectedValue) {
+    if (!selectEl) return;
+    loadCategories().then(categories => {
+        const currentVal = selectedValue || 'Custom';
+        let html = categories.map(c =>
+            `<option value="${esc(c)}" ${c === currentVal ? 'selected' : ''}>${esc(c)}</option>`
+        ).join('');
+        html += `<option value="__new__">+ New Category...</option>`;
+        selectEl.innerHTML = html;
+        selectEl.value = currentVal;
+
+        // Show/hide new category input
+        handleCategorySelectChange(selectEl);
+    });
+}
+
+function handleCategorySelectChange(selectEl) {
+    const wrapper = document.getElementById('scriptNewCategoryWrapper');
+    if (!wrapper) return;
+    wrapper.style.display = selectEl.value === '__new__' ? 'block' : 'none';
+}
+
+function formatDuration(ms) {
+    if (!ms && ms !== 0) return '-';
+    if (ms < 1000) return ms + 'ms';
+    if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+    const mins = Math.floor(ms / 60000);
+    const secs = ((ms % 60000) / 1000).toFixed(0);
+    return mins + 'm ' + secs + 's';
+}
+
+function timeAgo(timestamp) {
+    if (!timestamp) return 'never';
+    const now = Date.now();
+    const ts = new Date(timestamp).getTime();
+    const diff = now - ts;
+    if (diff < 0) return 'just now';
+    const seconds = Math.floor(diff / 1000);
+    if (seconds < 60) return seconds + 's ago';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return minutes + 'm ago';
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return hours + 'h ago';
+    const days = Math.floor(hours / 24);
+    if (days < 30) return days + 'd ago';
+    const months = Math.floor(days / 30);
+    return months + 'mo ago';
+}
+
+// ─── Data Loading ──────────────────────────────────────────
+
+async function loadScripts() {
+    try {
+        const scripts = await api('GET', '/scripts');
+        renderScriptCards(scripts);
+
+        // Load stats from /api/scripts/stats
+        try {
+            const stats = await api('GET', '/scripts/stats');
+            document.getElementById('statTotalScripts').textContent = stats.total_scripts || 0;
+            document.getElementById('statTotalRuns').textContent = stats.total_runs || 0;
+            document.getElementById('statPinned').textContent = stats.pinned_count || 0;
+            const rateEl = document.getElementById('statSuccessRate');
+            rateEl.textContent = stats.total_runs > 0 ? stats.success_rate + '%' : '—';
+            rateEl.style.color = stats.success_rate >= 80 ? 'var(--success)' : stats.success_rate >= 50 ? 'var(--warning)' : 'var(--danger)';
+            const durEl = document.getElementById('statAvgDuration');
+            durEl.textContent = stats.avg_duration_ms ? formatDuration(stats.avg_duration_ms) : '—';
+            // Category breakdown
+            const catStatEl = document.getElementById('scriptStats');
+            if (catStatEl && stats.categories) {
+                const entries = Object.entries(stats.categories);
+                catStatEl.innerHTML = entries.length > 0
+                    ? entries.map(([cat, count]) =>
+                        `<div style="display:flex;justify-content:space-between;gap:8px;">
+                            <span>${esc(cat)}</span>
+                            <strong>${count}</strong>
+                        </div>`
+                      ).join('')
+                    : '<span style="color:var(--text-muted)">No scripts</span>';
+            }
+            // Show "Seed Templates" button when no scripts exist
+            const seedBtn = document.getElementById('seedTemplatesBtn') || createSeedBtn();
+        } catch (e) {
+            // Stats endpoint not available
+        }
+
+        // Populate filter category dropdown from API
+        populateFilterCategories();
+    } catch (err) {
+        console.error('loadScripts error:', err);
+        showToast('Failed to load scripts: ' + err.message, 'error');
+    }
+}
+
+function createSeedBtn() {
+    const header = document.querySelector('#page-scripts .page-header');
+    if (!header) return null;
+    const btn = document.createElement('button');
+    btn.id = 'seedTemplatesBtn';
+    btn.className = 'btn btn-secondary';
+    btn.innerHTML = '<span class="material-icons" style="font-size:18px">auto_awesome</span> Seed Templates';
+    btn.onclick = seedTemplates;
+    btn.style.marginLeft = '8px';
+    // Insert after the import button group
+    const btnGroup = header.querySelector('div[style*="display:flex"]');
+    if (btnGroup) btnGroup.appendChild(btn);
+    return btn;
+}
+
+async function seedTemplates() {
+    showConfirm('Add 10 built-in script templates? (Docker system prune, System Update, Disk Usage, etc.) — only available when no scripts exist yet.', async () => {
+        try {
+            const res = await api('POST', '/scripts/seed-templates');
+            if (res.count > 0) {
+                showToast(`Seeded ${res.count} template scripts!`, 'success');
+                loadScripts();
+            } else {
+                showToast(res.message || 'Templates already exist', 'info');
+            }
+        } catch (err) {
+            showToast('Failed to seed templates: ' + err.message, 'error');
+        }
+    });
+}
+
+async function populateFilterCategories() {
+    const filterSelect = document.getElementById('scriptCategoryFilter');
+    if (!filterSelect) return;
+    try {
+        const res = await api('GET', '/scripts/categories');
+        const cats = res.categories || [];
+        const currentVal = filterSelect.value || '';
+        filterSelect.innerHTML = '<option value="">All Categories</option>' +
+            cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+        filterSelect.value = currentVal;
+    } catch (err) {
+        // Fallback — already hardcoded in HTML
+    }
+}
+
+async function loadScriptRuns() {
+    try {
+        const runs = await api('GET', '/scripts/runs?limit=20');
+        renderScriptRuns(runs);
+    } catch (err) {
+        console.error('loadScriptRuns error:', err);
+        showToast('Failed to load script runs: ' + err.message, 'error');
+    }
+}
+
+function renderScriptCards(scripts) {
+    const grid = document.getElementById('scriptGrid');
+    if (!grid) return;
+    if (!scripts || scripts.length === 0) {
+        grid.innerHTML = `<div class="empty-state">
+            <div class="empty-icon">📜</div>
+            <p>No scripts yet. <a href="#" onclick="openScriptForm()">Create your first script</a></p>
+            <p style="font-size:13px;color:var(--text-muted);margin-top:8px;">
+                Or <a href="#" onclick="seedTemplates()">seed built-in templates</a> to get started instantly.
+            </p>
+        </div>`;
+        return;
+    }
+    grid.innerHTML = scripts.map(s => {
+        const cat = s.category || 'Custom';
+        const icon = getScriptCategoryIcon(cat);
+        const catClass = getScriptCategoryClass(cat);
+        const catTag = catClass ? `<span class="tag tag-${catClass}">${esc(cat)}</span>` : `<span class="tag">${esc(cat)}</span>`;
+        // Parse tags - they come as JSON string "[]" from backend
+        let tags = [];
+        try { tags = typeof s.tags === 'string' ? JSON.parse(s.tags || '[]') : (s.tags || []); } catch(e) { tags = []; }
+        const tagsHtml = tags.length > 0
+            ? tags.map(t => `<span class="tag tag-sm">${esc(t)}</span>`).join('')
+            : '';
+        const runCount = s.run_count !== undefined ? s.run_count : 0;
+        const avgDuration = s.avg_exec_time_ms ? formatDuration(s.avg_exec_time_ms) : '';
+        const canRun = isOperator();
+        const canEdit = isAdmin();
+        const isPinned = s.pinned === true;
+        return `<div class="vps-card script-card"
+                data-name="${esc(s.name || '')}"
+                data-desc="${esc(s.description || '')}"
+                data-category="${esc(cat)}"
+                data-sort="${s.created_at || 0}"
+                data-runs="${runCount}">
+            <div class="vps-card-header">
+                <div class="vps-card-name">
+                    ${isPinned ? '<span class="material-icons" style="font-size:16px;color:var(--warning);margin-right:4px;">star</span>' : ''}
+                    <span class="material-icons" style="font-size:20px;margin-right:8px;color:var(--${catClass || 'text-muted'})">${icon}</span>
+                    ${esc(s.name || s.title || 'Untitled')}
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                    ${canEdit ? `<button class="btn btn-sm btn-ghost" onclick="togglePinScript('${s.id}', ${isPinned})" title="${isPinned ? 'Unpin' : 'Pin to top'}" style="padding:2px 4px;min-width:auto;">
+                        <span class="material-icons" style="font-size:16px;color:${isPinned ? 'var(--warning)' : 'var(--text-muted)'}">${isPinned ? 'star' : 'star_border'}</span>
+                    </button>` : ''}
+                    ${catTag}
+                </div>
+            </div>
+            ${s.description ? `<div style="font-size:12px;color:var(--text-muted);padding:0 16px 8px;line-height:1.4">${esc(s.description)}</div>` : ''}
+            ${tagsHtml ? `<div class="vps-card-tags">${tagsHtml}</div>` : ''}
+            <div style="font-size:11px;color:var(--text-muted);padding:4px 16px 8px;display:flex;gap:16px;">
+                <span><span class="material-icons" style="font-size:14px;vertical-align:middle">play_arrow</span> ${runCount} runs</span>
+                ${avgDuration ? `<span><span class="material-icons" style="font-size:14px;vertical-align:middle">timer</span> avg ${avgDuration}</span>` : ''}
+            </div>
+            <div class="script-card-actions">
+                <button class="btn btn-sm btn-ghost" onclick="openScriptView('${s.id}')"><span class="material-icons" style="font-size:14px">visibility</span> View</button>
+                ${canRun ? `<button class="btn btn-sm btn-primary" onclick="openScriptRun('${s.id}')"><span class="material-icons" style="font-size:14px">play_arrow</span> Run</button>` : ''}
+                ${canEdit ? `<button class="btn btn-sm" onclick="openScriptForm('${s.id}')"><span class="material-icons" style="font-size:14px">edit</span> Edit</button>` : ''}
+                ${canEdit ? `<button class="btn btn-sm" onclick="duplicateScript('${s.id}')"><span class="material-icons" style="font-size:14px">content_copy</span> Clone</button>` : ''}
+                ${canEdit ? `<button class="btn btn-sm" onclick="exportScript('${s.id}')"><span class="material-icons" style="font-size:14px">file_download</span> Export</button>` : ''}
+                ${canEdit ? `<button class="btn btn-sm btn-danger" onclick="deleteScript('${s.id}')"><span class="material-icons" style="font-size:14px">delete</span> Delete</button>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function renderScriptRuns(runs) {
+    const tbody = document.getElementById('scriptRecentRuns');
+    if (!tbody) return;
+    if (!runs || runs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">No recent runs.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = runs.map(r => {
+        const status = r.status || r.result || 'unknown';
+        const isSuccess = status === 'success' || status === 'Success' || r.success === true;
+        const statusIcon = isSuccess ? 'check_circle' : (status === 'running' ? 'hourglass_top' : 'error');
+        const statusColor = isSuccess ? 'var(--success)' : (status === 'running' ? 'var(--warning)' : 'var(--danger)');
+        const statusText = isSuccess ? 'Success' : (status === 'running' ? 'Running' : 'Failed');
+        const duration = formatDuration(r.duration_ms || r.exec_time_ms || 0);
+        const ts = r.finished_at ? timeAgo(r.finished_at) : (r.started_at ? timeAgo(r.started_at) : '-');
+        const scriptName = r.script_name || '-';
+        const vpsName = r.vps_name || r.vps_id || '-';
+        const triggeredBy = r.triggered_by || '-';
+        const runId = r.id;
+        const scriptId = r.script_id;
+        const canRun = isOperator();
+        return `<tr>
+            <td style="white-space:nowrap;">
+                <span class="material-icons" style="font-size:16px;color:${statusColor};vertical-align:middle">${statusIcon}</span>
+                <span style="color:${statusColor};font-weight:500;">${statusText}</span>
+            </td>
+            <td><strong>${esc(scriptName)}</strong></td>
+            <td>${esc(vpsName)}</td>
+            <td>${duration}</td>
+            <td style="font-size:12px;color:var(--text-muted)">${ts}</td>
+            <td style="font-size:12px;color:var(--text-muted)">${esc(triggeredBy)}</td>
+            <td style="white-space:nowrap;">
+                <button class="btn btn-sm btn-ghost" onclick="openScriptOutput('${runId}')" title="View Full Output">
+                    <span class="material-icons" style="font-size:14px">visibility</span>
+                </button>
+                ${canRun && scriptId ? `<button class="btn btn-sm btn-ghost" onclick="rerunScriptRun('${scriptId}')" title="Re-run on same VPS">
+                    <span class="material-icons" style="font-size:14px">replay</span>
+                </button>` : ''}
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+// ─── Syntax Highlighting ───────────────────────────────────
+function highlightBash(code) {
+    if (!code) return '';
+    const escaped = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    // Apply highlighting with spans
+    return escaped
+        // Comments: # ... to end of line
+        .replace(/(#.*)$/gm, '<span class="syn-comment">$1</span>')
+        // Double-quoted strings
+        .replace(/"([^"\\]*(\\.[^"\\]*)*)"/g, '<span class="syn-string">"$1"</span>')
+        // Single-quoted strings
+        .replace(/'([^'\\]*(\\.[^'\\]*)*)'/g, "<span class='syn-string'>'$1'</span>")
+        // Backtick commands
+        .replace(/`([^`]*)`/g, '<span class="syn-backtick">`$1`</span>')
+        // Variables: $VAR, ${VAR}, ${VAR:-default}
+        .replace(/\$\{?(\w+)\}?/g, '<span class="syn-variable">$$$1</span>')
+        // Numbers
+        .replace(/\b(\d+)\b/g, '<span class="syn-number">$1</span>')
+        // Keywords/commands (after strings/comments so they don't clash)
+        .replace(/\b(sudo|apt|apt-get|yum|dnf|pip|npm|docker|systemctl|service|ssh|scp|rsync|curl|wget|grep|sed|awk|cat|echo|chmod|chown|mkdir|rm|cp|mv|tar|git|make|cd|exit|source|export|alias|if|then|else|fi|for|while|do|done|function|return|case|esac|break|continue)\b/g, '<span class="syn-keyword">$1</span>')
+        // Flags: --flag or -f
+        .replace(/(--?\w[\w-]*)/g, '<span class="syn-flag">$1</span>');
+}
+
+// ─── Script View Modal (Read-only) ─────────────────────────
+
+function openScriptView(scriptId) {
+    const modal = document.getElementById('scriptViewModal');
+    const titleEl = document.getElementById('scriptViewTitle');
+    const descEl = document.getElementById('scriptViewDescription');
+    const codeEl = document.getElementById('scriptViewCode');
+    const catTag = document.getElementById('scriptViewCategoryTag');
+    const statsEl = document.getElementById('scriptViewStats');
+    const runAsEl = document.getElementById('scriptViewRunAs');
+    const timeoutEl = document.getElementById('scriptViewTimeout');
+    const rootEl = document.getElementById('scriptViewRoot');
+
+    // Reset
+    titleEl.textContent = 'Loading...';
+    descEl.textContent = '';
+    codeEl.innerHTML = '';
+    catTag.textContent = '...';
+    statsEl.textContent = '';
+    modal.classList.remove('hidden');
+
+    (async () => {
+        try {
+            const s = await api('GET', `/scripts/${scriptId}`);
+            titleEl.textContent = s.name || s.title || 'Untitled';
+            descEl.textContent = s.description || 'No description';
+            codeEl.innerHTML = highlightBash(s.command || s.content || '');
+            catTag.textContent = s.category || 'Custom';
+
+            const cat = s.category || 'Custom';
+            const catClass = getScriptCategoryClass(cat);
+            if (catClass) {
+                catTag.className = `tag tag-${catClass}`;
+            } else {
+                catTag.className = 'tag';
+            }
+
+            const runCount = s.run_count !== undefined ? s.run_count : 0;
+            const lastRun = s.last_run ? timeAgo(s.last_run) : 'never';
+            statsEl.textContent = `${runCount} runs · last ${lastRun}`;
+
+            runAsEl.innerHTML = `<span class="material-icons" style="font-size:14px;vertical-align:middle">person</span> Run as: ${s.run_as || 'current_user'}`;
+            timeoutEl.innerHTML = `<span class="material-icons" style="font-size:14px;vertical-align:middle">timer</span> Timeout: ${s.timeout || 30}s`;
+            rootEl.innerHTML = `<span class="material-icons" style="font-size:14px;vertical-align:middle">security</span> Root: ${s.requires_root ? 'Yes' : 'No'}`;
+        } catch (err) {
+            showToast('Failed to load script: ' + err.message, 'error');
+            closeScriptView();
+        }
+    })();
+}
+
+function closeScriptView() {
+    document.getElementById('scriptViewModal').classList.add('hidden');
+}
+
+// ─── CRUD Functions ────────────────────────────────────────
+
+function openScriptForm(scriptId) {
+    const modal = document.getElementById('scriptFormModal');
+    const titleEl = document.getElementById('scriptFormModalTitle');
+    const idField = document.getElementById('scriptFormId');
+    const nameField = document.getElementById('scriptFormName');
+    const descField = document.getElementById('scriptFormDescription');
+    const contentField = document.getElementById('scriptFormCommand');
+    const categoryField = document.getElementById('scriptFormCategory');
+    const newCatWrapper = document.getElementById('scriptNewCategoryWrapper');
+    const newCatInput = document.getElementById('scriptNewCategoryInput');
+    const runAsField = document.getElementById('scriptFormRunAs');
+    const timeoutField = document.getElementById('scriptFormTimeout');
+    const requiresRootField = document.getElementById('scriptFormRequiresRoot');
+
+    // Reset form
+    nameField.value = '';
+    descField.value = '';
+    contentField.value = '';
+    categoryField.value = 'Custom';
+    idField.value = '';
+    titleEl.textContent = 'Create Script';
+    if (newCatWrapper) newCatWrapper.style.display = 'none';
+    if (newCatInput) newCatInput.value = '';
+    if (runAsField) runAsField.value = 'current_user';
+    if (timeoutField) timeoutField.value = '30';
+    if (requiresRootField) requiresRootField.checked = false;
+
+    // Populate category dropdown dynamically
+    populateCategoryDropdown(categoryField, 'Custom');
+
+    if (scriptId) {
+        titleEl.textContent = 'Edit Script';
+        // Fetch script data for editing
+        (async () => {
+            try {
+                const s = await api('GET', `/scripts/${scriptId}`);
+                idField.value = s.id;
+                nameField.value = s.name || s.title || '';
+                descField.value = s.description || '';
+                contentField.value = s.command || s.content || '';
+                if (runAsField) runAsField.value = s.run_as || 'current_user';
+                if (timeoutField) timeoutField.value = String(s.timeout || '30');
+                if (requiresRootField) requiresRootField.checked = !!s.requires_root;
+                // Populate dropdown with current category selected
+                populateCategoryDropdown(categoryField, s.category || 'Custom');
+            } catch (err) {
+                showToast('Failed to load script: ' + err.message, 'error');
+                return;
+            }
+        })();
+    }
+    modal.classList.remove('hidden');
+}
+
+async function saveScript() {
+    const idField = document.getElementById('scriptFormId');
+    const nameField = document.getElementById('scriptFormName');
+    const descField = document.getElementById('scriptFormDescription');
+    const contentField = document.getElementById('scriptFormCommand');
+    const categoryField = document.getElementById('scriptFormCategory');
+    const newCatWrapper = document.getElementById('scriptNewCategoryWrapper');
+    const newCatInput = document.getElementById('scriptNewCategoryInput');
+    const runAsField = document.getElementById('scriptFormRunAs');
+    const timeoutField = document.getElementById('scriptFormTimeout');
+    const requiresRootField = document.getElementById('scriptFormRequiresRoot');
+
+    const name = nameField.value.trim();
+    const content = contentField.value.trim();
+    if (!name) {
+        showToast('Script name is required', 'warning');
+        nameField.focus();
+        return;
+    }
+    if (!content) {
+        showToast('Script command is required', 'warning');
+        contentField.focus();
+        return;
+    }
+
+    // Check if a new category was typed
+    let category = categoryField.value || 'Custom';
+    if (category === '__new__' && newCatInput) {
+        const newCat = newCatInput.value.trim();
+        if (newCat) {
+            category = newCat;
+        } else {
+            showToast('Please enter a category name', 'warning');
+            newCatInput.focus();
+            return;
+        }
+    }
+
+    const data = {
+        name: name,
+        description: descField.value.trim(),
+        command: content,
+        category: category,
+        run_as: runAsField ? runAsField.value : 'current_user',
+        timeout: timeoutField ? parseInt(timeoutField.value) || 300 : 300,
+        requires_root: requiresRootField ? requiresRootField.checked : false,
+    };
+
+    const btn = document.querySelector('#scriptFormModal .btn-primary');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-icons" style="font-size:16px">hourglass_top</span> Saving...';
+    }
+
+    try {
+        const editId = idField.value;
+        if (editId) {
+            await api('PUT', `/scripts/${editId}`, data);
+            showToast('Script updated', 'success');
+        } else {
+            await api('POST', '/scripts', data);
+            showToast('Script created', 'success');
+        }
+        closeScriptForm();
+        loadScripts();
+    } catch (err) {
+        showToast('Error saving script: ' + err.message, 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-icons" style="font-size:16px">save</span> Save';
+        }
+    }
+}
+
+function closeScriptForm() {
+    document.getElementById('scriptFormModal').classList.add('hidden');
+}
+
+async function deleteScript(scriptId) {
+    if (!isAdmin()) return;
+    showConfirm('Delete this script? This cannot be undone.', async () => {
+        try {
+            await api('DELETE', `/scripts/${scriptId}`);
+            showToast('Script deleted', 'success');
+            loadScripts();
+        } catch (err) {
+            showToast('Error deleting script: ' + err.message, 'error');
+        }
+    });
+}
+
+async function duplicateScript(scriptId) {
+    if (!isAdmin()) return;
+    try {
+        await api('POST', `/scripts/${scriptId}/duplicate`);
+        showToast('Script duplicated', 'success');
+        loadScripts();
+    } catch (err) {
+        showToast('Error duplicating script: ' + err.message, 'error');
+    }
+}
+
+// ─── Run Functions ─────────────────────────────────────────
+
+async function openScriptRun(scriptId) {
+    const modal = document.getElementById('scriptRunModal');
+    const titleEl = document.getElementById('scriptRunName');
+    const vpsChecklist = document.getElementById('scriptVpsList');
+
+    // Fetch script details
+    let script;
+    try {
+        script = await api('GET', `/scripts/${scriptId}`);
+    } catch (err) {
+        showToast('Failed to load script: ' + err.message, 'error');
+        return;
+    }
+
+    titleEl.textContent = 'Run: ' + esc(script.name || script.title || scriptId);
+
+    // Fetch VPS list for selection
+    let vpsListData;
+    try {
+        vpsListData = await api('GET', '/vps');
+    } catch (err) {
+        showToast('Failed to load VPS list: ' + err.message, 'error');
+        return;
+    }
+
+    const accessibleList = filterVPSByAccess(vpsListData);
+    if (!accessibleList || accessibleList.length === 0) {
+        vpsChecklist.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)">No VPS available.</div>';
+    } else {
+        vpsChecklist.innerHTML = accessibleList.map(v => {
+            const statusDot = v.online ? 'online' : 'offline';
+            return `<label class="checkbox-label" style="display:flex;align-items:center;gap:8px;padding:6px 0;">
+                <input type="checkbox" class="script-vps-checkbox" value="${v.id}" checked>
+                <span class="status-dot ${statusDot}"></span>
+                <span>${esc(v.name)}</span>
+                <span style="font-size:11px;color:var(--text-muted)">${esc(v.host)}</span>
+            </label>`;
+        }).join('');
+    }
+
+    // Store script ID
+    modal.dataset.scriptId = scriptId;
+
+    // Reset options
+    document.getElementById('scriptRunTimeout').value = '60';
+    document.getElementById('scriptRunSudo').checked = false;
+
+    // Detect {{VAR}} patterns in command for script parameters
+    const varSection = document.getElementById('scriptVarSection');
+    const varInputs = document.getElementById('scriptVarInputs');
+    const command = script.command || '';
+    const varMatches = command.match(/\{\{(\w+)\}\}/g);
+    if (varMatches && varMatches.length > 0) {
+        // Extract unique variable names
+        const varNames = [...new Set(varMatches.map(m => m.replace(/\{|\}/g, '')))];
+        varSection.style.display = 'block';
+        varInputs.innerHTML = varNames.map(v => `
+            <div style="display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:12px;color:var(--text-secondary);font-weight:500;">${esc(v)}</label>
+                <input type="text" class="script-var-input" data-var="${esc(v)}"
+                    placeholder="Enter value for {{${esc(v)}}}"
+                    style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px;outline:none;">
+            </div>
+        `).join('');
+        // Store original command for substitution
+        modal.dataset.originalCommand = command;
+    } else {
+        varSection.style.display = 'none';
+        varInputs.innerHTML = '';
+        modal.dataset.originalCommand = '';
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeScriptRunModal() {
+    document.getElementById('scriptRunModal').classList.add('hidden');
+    // Clear variables section
+    const varSection = document.getElementById('scriptVarSection');
+    if (varSection) varSection.style.display = 'none';
+    const varInputs = document.getElementById('scriptVarInputs');
+    if (varInputs) varInputs.innerHTML = '';
+}
+
+function toggleScriptSelectAll() {
+    const selectAll = document.getElementById('scriptSelectAll');
+    const checkboxes = document.querySelectorAll('.script-vps-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = selectAll.checked;
+    });
+}
+
+async function executeScriptRun() {
+    const modal = document.getElementById('scriptRunModal');
+    const scriptId = modal.dataset.scriptId;
+    const selectedVps = [];
+    document.querySelectorAll('.script-vps-checkbox:checked').forEach(cb => {
+        selectedVps.push(cb.value);
+    });
+
+    if (selectedVps.length === 0) {
+        showToast('Please select at least one VPS', 'warning');
+        return;
+    }
+
+    const timeout = parseInt(document.getElementById('scriptRunTimeout').value) || 60;
+    const useSudo = document.getElementById('scriptRunSudo').checked;
+
+    // Substitute variables if any
+    let commandOverride = null;
+    const originalCommand = modal.dataset.originalCommand;
+    if (originalCommand) {
+        commandOverride = originalCommand;
+        document.querySelectorAll('.script-var-input').forEach(input => {
+            const varName = input.dataset.var;
+            const value = input.value.trim() || varName;
+            // Escape for safe shell usage (basic)
+            const escaped = value.replace(/'/g, "'\\''");
+            // Replace all occurrences of {{VAR_NAME}}
+            const regex = new RegExp('\\{\\{' + varName + '\\}\\}', 'g');
+            commandOverride = commandOverride.replace(regex, escaped);
+        });
+    }
+
+    const btn = document.getElementById('scriptRunExecuteBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons" style="font-size:16px">hourglass_top</span> Running...';
+
+    try {
+        const data = {
+            vps_ids: selectedVps,
+            timeout: timeout,
+            sudo: useSudo,
+            command_override: commandOverride,
+        };
+        const result = await api('POST', `/scripts/${scriptId}/run`, data);
+        showScriptRunResults(result.results, result.totals || result.summary);
+        closeScriptRunModal();
+        loadScriptRuns();
+    } catch (err) {
+        showToast('Script execution failed: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-icons" style="font-size:16px">play_arrow</span> Execute';
+    }
+}
+
+function showScriptRunResults(results, totals) {
+    const modal = document.getElementById('scriptRunResultsModal');
+    const body = document.getElementById('scriptRunResultsBody');
+    const summaryEl = document.getElementById('scriptRunResultsSummary');
+
+    if (!results || results.length === 0) {
+        body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)">No results returned.</div>';
+    } else {
+        const successCount = results.filter(r => r.success).length;
+        const failCount = results.length - successCount;
+        const totalTime = results.reduce((acc, r) => acc + (r.duration_ms || r.execution_time_ms || 0), 0);
+
+        if (summaryEl) {
+            const pct = results.length > 0 ? Math.round(successCount / results.length * 100) : 0;
+            let color = 'var(--success)';
+            if (failCount > 0) color = failCount === results.length ? 'var(--danger)' : 'var(--warning)';
+            summaryEl.innerHTML = `
+                <span style="font-weight:600;color:${color}">${successCount}/${results.length} succeeded (${pct}%)</span>
+                <span style="color:var(--text-muted);font-size:12px;margin-left:8px;">
+                    ${failCount > 0 ? '🔴 ' + failCount + ' failed' : '✅ all passed'}
+                </span>
+                <span style="color:var(--text-muted);font-size:12px;margin-left:16px;">
+                    Total: ${formatDuration(totalTime)}
+                </span>
+            `;
+        }
+
+        body.innerHTML = results.map(r => {
+            const isSuccess = r.success;
+            const statusIcon = isSuccess ? 'check_circle' : 'error';
+            const statusColor = isSuccess ? 'var(--success)' : 'var(--danger)';
+            const statusText = isSuccess ? 'Success' : 'Failed';
+            const output = esc(r.output || r.stdout || '');
+            const error = esc(r.error || r.stderr || '');
+            const duration = formatDuration(r.duration_ms || r.execution_time_ms);
+            const vpsName = r.vps_name || r.vps_id || 'Unknown';
+            return `<div class="bulk-result-item ${isSuccess ? 'success' : 'fail'}">
+                <div class="bulk-result-header" onclick="toggleBulkResultOutput(this)">
+                    <span class="material-icons" style="font-size:18px;color:${statusColor}">${statusIcon}</span>
+                    <span class="bulk-result-name">${esc(vpsName)}</span>
+                    <span class="bulk-result-time">${duration}</span>
+                    <span class="bulk-result-status" style="color:${statusColor}">${statusText}</span>
+                    <span class="material-icons" style="font-size:18px;color:var(--text-muted)">expand_more</span>
+                </div>
+                <div class="bulk-result-output">${output || error || '<span style="color:var(--text-muted)">(no output)</span>'}</div>
+            </div>`;
+        }).join('');
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeScriptRunResultsModal() {
+    document.getElementById('scriptRunResultsModal').classList.add('hidden');
+}
+
+// ─── Filter / Sort Scripts ─────────────────────────────────
+
+function filterScripts() {
+    const search = (document.getElementById('scriptSearchInput')?.value || '').toLowerCase();
+    const category = document.getElementById('scriptCategoryFilter')?.value || '';
+    const sort = document.getElementById('scriptSortFilter')?.value || 'newest';
+
+    const cards = document.querySelectorAll('#scriptGrid .script-card');
+    const visible = [];
+
+    cards.forEach(card => {
+        const name = (card.dataset.name || '').toLowerCase();
+        const desc = (card.dataset.desc || '').toLowerCase();
+        const cat = card.dataset.category || '';
+
+        const matchSearch = !search || name.includes(search) || desc.includes(search);
+        const matchCat = !category || cat === category;
+        card.style.display = matchSearch && matchCat ? '' : 'none';
+
+        if (matchSearch && matchCat) visible.push(card);
+    });
+
+    // Sort visible cards
+    const grid = document.getElementById('scriptGrid');
+    const cardsArr = Array.from(grid.querySelectorAll('.script-card'));
+    const sorted = cardsArr.filter(c => c.style.display !== 'none').sort((a, b) => {
+        const va = a.dataset.sort || '';
+        const vb = b.dataset.sort || '';
+        if (sort === 'name') return (a.dataset.name || '').localeCompare(b.dataset.name || '');
+        if (sort === 'runs') return parseInt(b.dataset.runs || '0') - parseInt(a.dataset.runs || '0');
+        if (sort === 'oldest') return parseFloat(a.dataset.created || '0') - parseFloat(b.dataset.created || '0');
+        return parseFloat(b.dataset.created || '0') - parseFloat(a.dataset.created || '0');
+    });
+
+    sorted.forEach(c => grid.appendChild(c));
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SCRIPT LIBRARY — NEW FEATURES (Pin, Export, Import, Re-run, Output Detail)
+// ═══════════════════════════════════════════════════════════════
+
+// ─── Pin / Unpin Toggle ──────────────────────────────────────
+
+async function togglePinScript(scriptId, currentlyPinned) {
+    if (!isAdmin()) return;
+    try {
+        const res = await api('PATCH', `/scripts/${scriptId}/pin`);
+        showToast(res.pinned ? '⭐ Script pinned' : 'Script unpinned', 'success');
+        loadScripts();
+    } catch (err) {
+        showToast('Error toggling pin: ' + err.message, 'error');
+    }
+}
+
+// ─── Export Script ───────────────────────────────────────────
+
+async function exportScript(scriptId) {
+    try {
+        const data = await api('GET', `/scripts/${scriptId}/export`);
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${data.script.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('Script exported', 'success');
+    } catch (err) {
+        showToast('Error exporting script: ' + err.message, 'error');
+    }
+}
+
+// ─── Import Script ───────────────────────────────────────────
+
+function importScriptFile() {
+    document.getElementById('scriptImportInput').click();
+}
+
+async function onScriptImportFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        // Validate format
+        if (!data.script || !data.script.name || !data.script.command) {
+            showToast('Invalid script file format', 'error');
+            return;
+        }
+        const s = data.script;
+        await api('POST', '/scripts/import', {
+            name: s.name,
+            description: s.description || '',
+            category: s.category || 'Custom',
+            command: s.command,
+            run_as: s.run_as || 'current_user',
+            requires_root: s.requires_root || false,
+            timeout: s.timeout || 300,
+            tags: s.tags || '[]',
+        });
+        showToast(`Script "${s.name}" imported`, 'success');
+        loadScripts();
+    } catch (err) {
+        showToast('Error importing script: ' + err.message, 'error');
+    }
+    // Reset input
+    event.target.value = '';
+}
+
+// ─── Re-run Script ───────────────────────────────────────────
+
+async function rerunScriptRun(scriptId) {
+    if (!isOperator()) return;
+    try {
+        showToast('Re-running script...', 'info');
+        const result = await api('POST', `/scripts/${scriptId}/re-run`, { parallel: true });
+        showScriptRunResults(result.results, result.summary);
+        loadScriptRuns();
+    } catch (err) {
+        showToast('Error re-running script: ' + err.message, 'error');
+    }
+}
+
+// ─── Output Detail Modal ─────────────────────────────────────
+
+async function openScriptOutput(runId) {
+    const modal = document.getElementById('scriptOutputModal');
+    if (!modal) return;
+    try {
+        const run = await api('GET', `/scripts/runs/${runId}`);
+        const isSuccess = run.status === 'success' || run.status === 'Success' || run.success === true;
+        document.getElementById('scriptOutputTitle').textContent = `Output: ${esc(run.script_name || 'Script')}`;
+        document.getElementById('scriptOutputStatus').innerHTML = isSuccess
+            ? '<span style="color:var(--success)">✅ Success</span>'
+            : '<span style="color:var(--danger)">❌ Failed</span>';
+        document.getElementById('scriptOutputDuration').textContent = run.exec_time_ms ? formatDuration(run.exec_time_ms) : '';
+        document.getElementById('scriptOutputVps').textContent = `🖥️ ${esc(run.vps_name || run.vps_id || 'Unknown')}`;
+        document.getElementById('scriptOutputScript').textContent = `📜 ${esc(run.script_name || '')}`;
+        document.getElementById('scriptOutputTrigger').textContent = `👤 ${esc(run.triggered_by || 'manual')}`;
+
+        const outputEl = document.getElementById('scriptOutputContent');
+        const output = run.output || run.stdout || '(no output)';
+        outputEl.innerHTML = `<code>${esc(output)}</code>`;
+
+        const errorEl = document.getElementById('scriptOutputError');
+        const errorContent = document.getElementById('scriptOutputErrorContent');
+        if (run.error || run.stderr) {
+            errorEl.style.display = 'block';
+            errorContent.innerHTML = `<code>${esc(run.error || run.stderr)}</code>`;
+        } else {
+            errorEl.style.display = 'none';
+        }
+
+        document.getElementById('scriptOutputExitCode').textContent = run.exit_code !== null && run.exit_code !== undefined
+            ? `Exit code: ${run.exit_code}`
+            : '';
+
+        modal.classList.remove('hidden');
+    } catch (err) {
+        showToast('Failed to load run details: ' + err.message, 'error');
+    }
+}
+
+function closeScriptOutputModal() {
+    document.getElementById('scriptOutputModal').classList.add('hidden');
+}
+
+function copyScriptOutput() {
+    const content = document.getElementById('scriptOutputContent');
+    const text = content.textContent || '';
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Output copied to clipboard', 'success');
+    }).catch(() => {
+        showToast('Failed to copy', 'error');
+    });
+}
+
+// ─── Refresh Handler (F5 / Pull-to-Refresh) ────────────────
+
+function refreshCurrentPage() {
+    const active = document.querySelector('.page.active');
+    if (!active) return;
+    const pageId = active.id?.replace('page-', '');
+    const refreshMap = {
+        'dashboard': refreshDashboard,
+        'vps-list': loadVPSList,
+        'vps-detail': refreshVPSDetail,
+        'users': loadUsersList,
+        'github': refreshGitHubActions,
+        'scripts': () => { loadScripts(); loadScriptRuns(); },
+    };
+    const fn = refreshMap[pageId];
+    if (fn) {
+        fn();
+        showToast('Page refreshed', 'success');
+    } else {
+        // For pages without a specific refresh, just show a pulse
+        active.style.transition = 'opacity 0.15s';
+        active.style.opacity = '0.5';
+        setTimeout(() => { active.style.opacity = '1'; }, 200);
+        showToast('Refreshed', 'success');
+    }
+}
+
+function initRefreshHandler() {
+    // Keyboard: F5 / Cmd+R / Ctrl+R
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'F5' || (e.metaKey && e.key === 'r') || (e.ctrlKey && e.key === 'r')) {
+            e.preventDefault();
+            refreshCurrentPage();
+        }
+    });
+
+    // Pull-to-refresh via touch
+    const content = document.querySelector('.content');
+    if (!content) return;
+
+    let ptrState = { startY: 0, pulling: false, currentY: 0 };
+    const threshold = 80;
+
+    const ptrEl = document.createElement('div');
+    ptrEl.id = 'ptr-indicator';
+    ptrEl.className = 'ptr-indicator';
+    ptrEl.innerHTML = '<div class="ptr-spinner"><span class="material-icons">arrow_downward</span></div><div class="ptr-label">Pull to refresh</div>';
+    document.querySelector('.main-panel')?.prepend(ptrEl);
+
+    function ptrStart(e) {
+        if (content.scrollTop > 0) return;
+        ptrState.startY = e.touches ? e.touches[0].clientY : e.clientY;
+        ptrState.pulling = true;
+        ptrState.currentY = 0;
+    }
+
+    function ptrMove(e) {
+        if (!ptrState.pulling) return;
+        const y = e.touches ? e.touches[0].clientY : e.clientY;
+        const diff = y - ptrState.startY;
+        if (diff <= 0) { ptrState.pulling = false; ptrState.currentY = 0; ptrEl.className = 'ptr-indicator'; return; }
+
+        ptrState.currentY = diff;
+        const pull = Math.min(diff * 0.4, 100);
+        ptrEl.style.transform = `translateY(${pull}px)`;
+        ptrEl.style.opacity = Math.min(diff / 60, 1);
+
+        if (diff >= threshold) {
+            ptrEl.className = 'ptr-indicator ptr-ready';
+            ptrEl.querySelector('.ptr-label').textContent = 'Release to refresh';
+        } else {
+            ptrEl.className = 'ptr-indicator';
+            ptrEl.querySelector('.ptr-label').textContent = 'Pull to refresh';
+        }
+    }
+
+    function ptrEnd() {
+        if (ptrState.currentY >= threshold) {
+            ptrEl.className = 'ptr-indicator ptr-refreshing';
+            ptrEl.querySelector('.ptr-label').textContent = 'Refreshing...';
+            refreshCurrentPage();
+        }
+        ptrEl.style.transform = '';
+        ptrEl.style.opacity = '';
+        ptrState.pulling = false;
+        ptrState.currentY = 0;
+        setTimeout(() => {
+            ptrEl.className = 'ptr-indicator';
+        }, 600);
+    }
+
+    content.addEventListener('touchstart', ptrStart, { passive: true });
+    content.addEventListener('touchmove', ptrMove, { passive: true });
+    content.addEventListener('touchend', ptrEnd);
+    // Desktop: drag-to-refresh from top
+    content.addEventListener('mousedown', (e) => { if (e.button === 0) ptrStart(e); });
+    content.addEventListener('mousemove', ptrMove);
+    content.addEventListener('mouseup', ptrEnd);
+    content.addEventListener('mouseleave', ptrEnd);
+}
 
 // ─── Init ───────────────────────────────────────────────────
 checkAuth();

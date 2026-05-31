@@ -152,6 +152,44 @@ class PersistentSession(Base):
     user_agent = Column(String(512), nullable=True)
 
 
+class Script(Base):
+    """Saved scripts/commands that can be run on VPS."""
+    __tablename__ = "scripts"
+
+    id = Column(String(32), primary_key=True)
+    name = Column(String(256), nullable=False)
+    description = Column(Text, default="")
+    category = Column(String(64), default="Custom")  # System, Docker, Database, Security, Monitoring, Custom
+    command = Column(Text, nullable=False)
+    run_as = Column(String(32), default="current_user")  # root, sudo, current_user
+    requires_root = Column(Boolean, default=False)
+    timeout = Column(Integer, default=300)
+    pinned = Column(Boolean, default=False)
+    tags = Column(Text, default="[]")  # JSON-encoded list of tag strings
+    created_by = Column(String(32), ForeignKey("users.id"), nullable=True)
+    created_at = Column(Float, default=time.time)
+    updated_at = Column(Float, default=time.time, onupdate=time.time)
+
+
+class ScriptRun(Base):
+    """Execution history of scripts on VPS."""
+    __tablename__ = "script_runs"
+
+    id = Column(String(32), primary_key=True)
+    script_id = Column(String(32), ForeignKey("scripts.id", ondelete="SET NULL"), nullable=True)
+    script_name = Column(String(256), nullable=False)
+    vps_id = Column(String(32), ForeignKey("vps.id"), nullable=False)
+    vps_name = Column(String(256), nullable=False)
+    status = Column(String(32), default="running")  # running, success, failed, timeout
+    output = Column(Text, default="")
+    error = Column(Text, default="")
+    exit_code = Column(Integer, nullable=True)
+    started_at = Column(Float, default=time.time)
+    finished_at = Column(Float, nullable=True)
+    triggered_by = Column(String(128), default="manual")  # manual, schedule, system
+    exec_time_ms = Column(Integer, nullable=True)
+
+
 # ─── Helpers ─────────────────────────────────────────────────
 
 def init_db():
@@ -200,6 +238,21 @@ def init_db():
                 print("[Migration] Added oidc_sub column to users for OIDC/SSO")
     except Exception as e:
         print(f"[Migration] oidc_sub column (may already exist): {e}")
+
+    # Migration: add pinned + tags to scripts for Script Library improvements
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name='scripts' AND column_name='pinned'"
+            ))
+            if not result.fetchone():
+                conn.execute(text("ALTER TABLE scripts ADD COLUMN pinned BOOLEAN DEFAULT FALSE"))
+                conn.execute(text("ALTER TABLE scripts ADD COLUMN tags TEXT DEFAULT '[]'"))
+                conn.commit()
+                print("[Migration] Added pinned and tags columns to scripts")
+    except Exception as e:
+        print(f"[Migration] scripts pinned/tags (may already exist): {e}")
 
 
 def get_db():

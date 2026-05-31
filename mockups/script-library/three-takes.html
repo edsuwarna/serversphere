@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Script Library — 3 Mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<style>
+:root {
+  --amber-400: #FBBF24;
+  --amber-500: #F59E0B;
+  --amber-600: #D97706;
+  --amber-700: #B45309;
+  --emerald-400: #34D399;
+  --emerald-500: #10B981;
+  --cyan-400: #22D3EE;
+  --rose-400: #FB7185;
+  --rose-500: #F43F5E;
+  --bg-body: #09090B;
+  --bg-sidebar: #111113;
+  --bg-card: #18181B;
+  --bg-card-hover: #1f1f23;
+  --bg-elevated: #1f1f23;
+  --bg-input: #09090B;
+  --border: #27272A;
+  --border-light: #18181B;
+  --text: #F4F4F5;
+  --text-secondary: #A1A1AA;
+  --text-muted: #52525B;
+  --font: 'Inter', -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: var(--font);
+  background: var(--bg-body);
+  color: var(--text);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.material-icons { font-size:20px; vertical-align:middle; }
+
+/* ═══ Tab bar ═══ */
+.tab-bar {
+  display: flex;
+  gap: 0;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.tab-btn {
+  font-family: var(--font);
+  padding: 14px 20px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+.tab-btn.active { color: var(--amber-400); border-bottom-color: var(--amber-400); }
+.tab-btn .badge {
+  background: var(--amber-500);
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 99px;
+  margin-left: 2px;
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ═══ Variant 1: Sidebar-list ═══ */
+.v1-layout { display: flex; height: calc(100vh - 49px); }
+.v1-sidebar {
+  width: 300px;
+  min-width: 300px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+.v1-search {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.v1-search input {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px 8px 36px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--font);
+}
+.v1-search-wrap { position: relative; }
+.v1-search-wrap .material-icons {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 18px;
+}
+.v1-categories {
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-light);
+  flex-wrap: wrap;
+}
+.v1-cat {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+.v1-cat:hover { border-color: var(--border); color: var(--text); }
+.v1-cat.active { background: rgba(245,158,11,0.15); color: var(--amber-400); border-color: rgba(245,158,11,0.3); }
+.v1-list { flex:1; overflow-y: auto; }
+.v1-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.v1-item:hover { background: var(--bg-elevated); }
+.v1-item.active { background: rgba(245,158,11,0.08); border-left: 2px solid var(--amber-400); }
+.v1-item-name {
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.v1-item-name .material-icons { font-size: 16px; color: var(--amber-400); }
+.v1-item-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 3px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.v1-item-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  display: flex;
+  gap: 12px;
+}
+.v1-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-body);
+}
+.v1-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.v1-toolbar-left { display: flex; align-items: center; gap: 12px; }
+.v1-toolbar h2 { font-size: 16px; font-weight: 600; }
+.v1-toolbar-right { display: flex; gap: 8px; }
+.btn {
+  font-family: var(--font);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  transition: all 0.12s;
+}
+.btn:hover { background: var(--bg-card-hover); border-color: var(--text-muted); }
+.btn-primary { background: var(--amber-500); color: #000; border-color: var(--amber-500); }
+.btn-primary:hover { background: var(--amber-400); }
+.btn-danger { background: transparent; color: var(--rose-400); border-color: transparent; }
+.btn-danger:hover { background: rgba(244,63,94,0.1); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-icon { padding: 7px; min-width: 34px; justify-content: center; }
+.v1-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+.v1-editor {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.v1-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.v1-editor-header .material-icons { font-size: 16px; }
+.v1-editor-body {
+  padding: 16px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  min-height: 160px;
+  white-space: pre-wrap;
+}
+.v1-editor-body .comment { color: var(--text-muted); }
+.v1-editor-body .cmd { color: var(--emerald-400); }
+.v1-editor-body .var { color: var(--amber-400); }
+.v1-editor-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+.v1-vps-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.v1-vps-select .tag {
+  background: rgba(6,182,212,0.12);
+  color: var(--cyan-400);
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+}
+.v1-output {
+  margin-top: 16px;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.v1-output-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.v1-output-body {
+  padding: 16px;
+  color: var(--emerald-400);
+  line-height: 1.6;
+  min-height: 80px;
+}
+
+/* ═══ Variant 2: Card Grid ═══ */
+.v2-layout { padding: 24px; max-width: 1200px; margin: 0 auto; }
+.v2-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.v2-header h1 { font-size: 22px; font-weight: 600; }
+.v2-header p { color: var(--text-secondary); font-size: 14px; margin-top: 4px; }
+.v2-stats {
+  display: flex;
+  gap: 24px;
+}
+.v2-stat { text-align: center; }
+.v2-stat-num { font-size: 24px; font-weight: 700; color: var(--amber-400); }
+.v2-stat-label { font-size: 12px; color: var(--text-muted); }
+.v2-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+.v2-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  transition: all 0.15s;
+}
+.v2-card:hover { border-color: var(--text-muted); background: var(--bg-card-hover); }
+.v2-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.v2-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: rgba(245,158,11,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--amber-400);
+}
+.v2-card-icon .material-icons { font-size: 18px; }
+.v2-card-title { font-size: 14px; font-weight: 600; }
+.v2-card-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.v2-card-tags { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.v2-tag {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+.v2-tag.danger { background: rgba(244,63,94,0.1); color: var(--rose-400); }
+.v2-tag.success { background: rgba(16,185,129,0.1); color: var(--emerald-400); }
+.v2-tag.warning { background: rgba(245,158,11,0.1); color: var(--amber-400); }
+.v2-tag.info { background: rgba(6,182,212,0.1); color: var(--cyan-400); }
+.v2-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+}
+.v2-card-actions .btn { flex:1; justify-content: center; font-size: 12px; }
+.v2-card-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  display: flex;
+  gap: 16px;
+}
+
+/* ═══ Variant 3: Terminal-panel ═══ */
+.v3-layout { display: flex; height: calc(100vh - 49px); }
+.v3-main { flex: 1; display: flex; flex-direction: column; }
+.v3-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-sidebar);
+}
+.v3-toolbar h2 { font-size: 14px; font-weight: 600; }
+.v3-toolbar .tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+}
+.v3-toolbar .tabs button {
+  font-family: var(--font);
+  font-size: 12px;
+  padding: 5px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.v3-toolbar .tabs button.active { background: var(--bg-card); color: var(--text); }
+.v3-table-wrap { flex: 1; overflow-y: auto; }
+.v3-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.v3-table th {
+  text-align: left;
+  padding: 10px 20px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-body);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.v3-table td {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-light);
+}
+.v3-table tr:hover td { background: var(--bg-elevated); }
+.v3-table .col-name { display: flex; align-items: center; gap: 10px; }
+.v3-table .col-name .material-icons { font-size: 16px; color: var(--amber-400); }
+.v3-table .col-cmd {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.v3-status {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-weight: 500;
+}
+.v3-status.idle { background: rgba(161,161,170,0.1); color: var(--text-secondary); }
+.v3-status.running { background: rgba(16,185,129,0.1); color: var(--emerald-400); }
+.v3-status.error { background: rgba(244,63,94,0.1); color: var(--rose-400); }
+.v3-actions { display: flex; gap: 4px; }
+.v3-actions .btn-icon { padding: 4px; min-width: 28px; height: 28px; font-size: 11px; border: none; background: transparent; color: var(--text-muted); }
+.v3-actions .btn-icon:hover { background: var(--bg-elevated); color: var(--text); border-radius: 4px; }
+.v3-bottom {
+  height: 220px;
+  border-top: 1px solid var(--border);
+  background: #000;
+  display: flex;
+  flex-direction: column;
+}
+.v3-bottom-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  background: #111;
+  border-bottom: 1px solid #222;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.v3-bottom-header .tabs { display: flex; gap: 12px; }
+.v3-bottom-header .tabs span { cursor: pointer; padding: 2px 0; }
+.v3-bottom-header .tabs span.active { color: var(--emerald-400); border-bottom: 1px solid var(--emerald-400); }
+.v3-terminal {
+  flex: 1;
+  padding: 12px 16px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--emerald-400);
+  overflow-y: auto;
+}
+.v3-terminal .prompt { color: var(--text-muted); }
+.v3-terminal .output { color: var(--text-secondary); }
+.v3-terminal .error-output { color: var(--rose-400); }
+.v3-terminal-input {
+  display: flex;
+  align-items: center;
+  padding: 6px 16px;
+  border-top: 1px solid #222;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.v3-terminal-input .prompt { color: var(--emerald-400); margin-right: 8px; }
+.v3-terminal-input input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  outline: none;
+}
+
+/* ═══ Modal (shared) ═══ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  display: none;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: 560px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-header h3 { font-size: 16px; font-weight: 600; }
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+.modal-close:hover { background: var(--bg-elevated); color: var(--text); }
+.modal-body { padding: 20px; }
+.form-group { margin-bottom: 16px; }
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--text-secondary);
+}
+.form-group input, .form-group textarea, .form-group select {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+}
+.form-group textarea { font-family: var(--mono); font-size: 12px; min-height: 100px; resize: vertical; }
+.form-group select { cursor: pointer; }
+.form-row { display: flex; gap: 12px; }
+.form-row .form-group { flex: 1; }
+.form-group .hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ Tab Bar ═══ -->
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="v1">
+    <span class="material-icons">view_sidebar</span>
+    Sidebar Editor <span class="badge">1</span>
+  </button>
+  <button class="tab-btn" data-tab="v2">
+    <span class="material-icons">grid_view</span>
+    Card Grid <span class="badge">2</span>
+  </button>
+  <button class="tab-btn" data-tab="v3">
+    <span class="material-icons">terminal</span>
+    Terminal Panel <span class="badge">3</span>
+  </button>
+  <span style="flex:1"></span>
+  <span style="color:var(--text-muted);font-size:12px;display:flex;align-items:center;gap:6px;padding:0 12px;">
+    <span class="material-icons" style="font-size:14px;">touch_app</span>
+    Click tabs to switch
+  </span>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- Variant 1: Sidebar Editor          -->
+<!-- ═══════════════════════════════════ -->
+<div class="tab-panel active" id="v1">
+<div class="v1-layout">
+
+  <!-- Left sidebar: script list -->
+  <div class="v1-sidebar">
+    <div class="v1-search">
+      <div class="v1-search-wrap">
+        <span class="material-icons">search</span>
+        <input type="text" placeholder="Search scripts..." value="update">
+      </div>
+    </div>
+    <div class="v1-categories">
+      <span class="v1-cat active">All</span>
+      <span class="v1-cat">System</span>
+      <span class="v1-cat">Docker</span>
+      <span class="v1-cat">Database</span>
+      <span class="v1-cat">Security</span>
+    </div>
+    <div class="v1-list">
+      <div class="v1-item active">
+        <div class="v1-item-name"><span class="material-icons">terminal</span> System Update</div>
+        <div class="v1-item-desc">Update all packages, clean apt cache, and check for reboot</div>
+        <div class="v1-item-meta"><span>🕐 2m 30s</span><span>🔁 47x ran</span><span>⚡ 5 VPS</span></div>
+      </div>
+      <div class="v1-item">
+        <div class="v1-item-name"><span class="material-icons">inventory_2</span> Docker Cleanup</div>
+        <div class="v1-item-desc">Remove unused containers, dangling images, and prune volumes</div>
+        <div class="v1-item-meta"><span>🕐 45s</span><span>🔁 23x ran</span><span>⚡ 3 VPS</span></div>
+      </div>
+      <div class="v1-item">
+        <div class="v1-item-name"><span class="material-icons">storage</span> DB Backup</div>
+        <div class="v1-item-desc">Dump all PostgreSQL databases and upload to S3-compatible storage</div>
+        <div class="v1-item-meta"><span>🕐 5m 12s</span><span>🔁 18x ran</span><span>⚡ 2 VPS</span></div>
+      </div>
+      <div class="v1-item">
+        <div class="v1-item-name"><span class="material-icons">lock</span> UFW Hardening</div>
+        <div class="v1-item-desc">Configure UFW defaults, allow common ports, enable firewall</div>
+        <div class="v1-item-meta"><span>🕐 30s</span><span>🔁 12x ran</span><span>⚡ 4 VPS</span></div>
+      </div>
+      <div class="v1-item">
+        <div class="v1-item-name"><span class="material-icons">monitor_heart</span> Health Check</div>
+        <div class="v1-item-desc">Run comprehensive health check: disk, memory, services, open ports</div>
+        <div class="v1-item-meta"><span>🕐 15s</span><span>🔁 89x ran</span><span>⚡ 7 VPS</span></div>
+      </div>
+      <div class="v1-item">
+        <div class="v1-item-name"><span class="material-icons">refresh</span> Restart Services</div>
+        <div class="v1-item-desc">Restart nginx, docker, and sshd services with zero-downtime check</div>
+        <div class="v1-item-meta"><span>🕐 20s</span><span>🔁 34x ran</span><span>⚡ 3 VPS</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right main: editor & run -->
+  <div class="v1-main">
+    <div class="v1-toolbar">
+      <div class="v1-toolbar-left">
+        <span class="material-icons" style="color:var(--amber-400);">terminal</span>
+        <h2>System Update</h2>
+        <span style="font-size:12px;color:var(--text-muted);background:var(--bg-elevated);padding:2px 8px;border-radius:99px;">System</span>
+      </div>
+      <div class="v1-toolbar-right">
+        <button class="btn" onclick="openModal()"><span class="material-icons" style="font-size:16px;">edit</span> Edit</button>
+        <button class="btn" onclick="openModal()"><span class="material-icons" style="font-size:16px;">content_copy</span> Duplicate</button>
+        <button class="btn btn-danger"><span class="material-icons" style="font-size:16px;">delete</span></button>
+      </div>
+    </div>
+
+    <div class="v1-content">
+      <!-- Editor -->
+      <div class="v1-editor">
+        <div class="v1-editor-header">
+          <span><span class="material-icons" style="font-size:14px;vertical-align:text-bottom;">code</span> system_update.sh</span>
+          <span style="display:flex;gap:8px;">
+            <span style="color:var(--text-muted);">Last run: 2h ago</span>
+            <span style="color:var(--emerald-400);">● 3 VPS selected</span>
+          </span>
+        </div>
+        <div class="v1-editor-body"><span class="comment">#!/bin/bash</span>
+<span class="comment"># System Update — update all packages & cleanup</span>
+<span class="comment"># ⚠️ Requires root/sudo access</span>
+
+<span class="cmd">apt update</span>
+<span class="cmd">apt upgrade -y</span>
+<span class="cmd">apt autoremove -y</span>
+<span class="cmd">apt autoclean</span>
+
+<span class="comment"># Check if reboot needed</span>
+<span class="cmd">if</span> [ -f /var/run/reboot-required ]; <span class="cmd">then</span>
+  <span class="cmd">echo</span> <span class="var">"⚠️ Reboot required — /var/run/reboot-required exists"</span>
+<span class="cmd">else</span>
+  <span class="cmd">echo</span> <span class="var">"✅ No reboot needed"</span>
+<span class="cmd">fi</span></div>
+        <div class="v1-editor-footer">
+          <div class="v1-vps-select">
+            <span class="material-icons" style="font-size:16px;">dns</span>
+            <span>Run on:</span>
+            <span class="tag">prod-web-01</span>
+            <span class="tag">prod-api-02</span>
+            <span class="tag">staging-01</span>
+            <span style="color:var(--text-muted);font-size:11px;">+2 more</span>
+          </div>
+          <span style="flex:1"></span>
+          <button class="btn btn-primary" onclick="simulateRun()">
+            <span class="material-icons" style="font-size:16px;">play_arrow</span>
+            Run Now
+          </button>
+          <button class="btn" onclick="openModal()">
+            <span class="material-icons" style="font-size:16px;">schedule</span>
+            Schedule
+          </button>
+        </div>
+      </div>
+
+      <!-- Output -->
+      <div class="v1-output" id="v1Output">
+        <div class="v1-output-header">
+          <span>Output — prod-web-01</span>
+          <span style="display:flex;gap:10px;">
+            <span>Exit code: <span style="color:var(--emerald-400);">0</span></span>
+            <span>Duration: 1m 24s</span>
+          </span>
+        </div>
+        <div class="v1-output-body" id="v1OutputBody">
+Reading package lists... Done<br>
+Building dependency tree... Done<br>
+35 packages can be upgraded. Running upgrade...<br>
+Setting up libssl3 (3.0.9-1) ...<br>
+Setting up openssh-server (1:9.0p1-1) ...<br>
+✔ All packages upgraded successfully.<br>
+0 packages removed, 0 not upgraded.<br>
+<span style="color:var(--text-muted);">✅ No reboot needed</span><br>
+<span style="color:var(--emerald-400);">✔ Completed on prod-web-01</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- Variant 2: Card Grid                -->
+<!-- ═══════════════════════════════════ -->
+<div class="tab-panel" id="v2">
+<div class="v2-layout">
+  <div class="v2-header">
+    <div>
+      <h1>📋 Script Library</h1>
+      <p>Saved commands & automation scripts for your VPS fleet</p>
+    </div>
+    <div style="display:flex;gap:24px;align-items:center;">
+      <div class="v2-stats">
+        <div class="v2-stat"><div class="v2-stat-num">12</div><div class="v2-stat-label">Scripts</div></div>
+        <div class="v2-stat"><div class="v2-stat-num">223</div><div class="v2-stat-label">Runs</div></div>
+        <div class="v2-stat"><div class="v2-stat-num">7</div><div class="v2-stat-label">VPS</div></div>
+      </div>
+      <button class="btn btn-primary" onclick="openModal()">
+        <span class="material-icons" style="font-size:16px;">add</span> New Script
+      </button>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+    <input type="text" placeholder="Search scripts..." value="update"
+      style="flex:1;min-width:200px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;color:var(--text);font-family:var(--font);font-size:13px;">
+    <select style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;color:var(--text);font-family:var(--font);font-size:13px;">
+      <option>All Categories</option><option>System</option><option>Docker</option><option>Database</option><option>Security</option>
+    </select>
+    <select style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;color:var(--text);font-family:var(--font);font-size:13px;">
+      <option>Sort by: Last run</option><option>Sort by: Name</option><option>Sort by: Most runs</option>
+    </select>
+  </div>
+
+  <div class="v2-grid">
+    <!-- Card 1 -->
+    <div class="v2-card">
+      <div class="v2-card-top">
+        <div class="v2-card-icon"><span class="material-icons">terminal</span></div>
+        <div class="v2-card-chevron" style="color:var(--text-muted);font-size:13px;">▸ 5 VPS</div>
+      </div>
+      <div class="v2-card-title">System Update</div>
+      <div class="v2-card-desc">Update all packages, clean apt cache, and check if reboot is required</div>
+      <div class="v2-card-tags">
+        <span class="v2-tag warning">System</span>
+        <span class="v2-tag success">Safe</span>
+      </div>
+      <div class="v2-card-meta">
+        <span>⏱ 2m 30s</span>
+        <span>🔁 47 runs</span>
+        <span title="Last run">2h ago</span>
+      </div>
+      <div class="v2-card-actions">
+        <button class="btn btn-primary btn-sm" onclick="simulateRun()"><span class="material-icons" style="font-size:14px;">play_arrow</span> Run</button>
+        <button class="btn btn-sm" onclick="openModal()"><span class="material-icons" style="font-size:14px;">edit</span> Edit</button>
+        <button class="btn btn-sm" onclick="openModal()"><span class="material-icons" style="font-size:14px;">content_copy</span> Clone</button>
+      </div>
+    </div>
+    <!-- Card 2 -->
+    <div class="v2-card" style="border-color:var(--border);">
+      <div class="v2-card-top">
+        <div class="v2-card-icon"><span class="material-icons">inventory_2</span></div>
+        <div class="v2-card-chevron" style="color:var(--text-muted);font-size:13px;">▸ 3 VPS</div>
+      </div>
+      <div class="v2-card-title">Docker Cleanup</div>
+      <div class="v2-card-desc">Remove unused containers, dangling images, prune volumes & networks</div>
+      <div class="v2-card-tags">
+        <span class="v2-tag info">Docker</span>
+        <span class="v2-tag">Cleanup</span>
+      </div>
+      <div class="v2-card-meta">
+        <span>⏱ 45s</span>
+        <span>🔁 23 runs</span>
+        <span>1d ago</span>
+      </div>
+      <div class="v2-card-actions">
+        <button class="btn btn-primary btn-sm" onclick="simulateRun()"><span class="material-icons" style="font-size:14px;">play_arrow</span> Run</button>
+        <button class="btn btn-sm"><span class="material-icons" style="font-size:14px;">edit</span> Edit</button>
+        <button class="btn btn-sm"><span class="material-icons" style="font-size:14px;">content_copy</span> Clone</button>
+      </div>
+    </div>
+    <!-- Card 3 -->
+    <div class="v2-card">
+      <div class="v2-card-top">
+        <div class="v2-card-icon"><span class="material-icons">storage</span></div>
+        <div class="v2-card-chevron" style="color:var(--text-muted);font-size:13px;">▸ 2 VPS</div>
+      </div>
+      <div class="v2-card-title">DB Backup</div>
+      <div class="v2-card-desc">Dump all PostgreSQL databases and upload to S3-compatible storage</div>
+      <div class="v2-card-tags">
+        <span class="v2-tag warning">Database</span>
+        <span class="v2-tag">Backup</span>
+        <span class="v2-tag danger">Root</span>
+      </div>
+      <div class="v2-card-meta">
+        <span>⏱ 5m 12s</span>
+        <span>🔁 18 runs</span>
+        <span>6h ago</span>
+      </div>
+      <div class="v2-card-actions">
+        <button class="btn btn-primary btn-sm" onclick="simulateRun()"><span class="material-icons" style="font-size:14px;">play_arrow</span> Run</button>
+        <button class="btn btn-sm"><span class="material-icons" style="font-size:14px;">edit</span> Edit</button>
+        <button class="btn btn-sm"><span class="material-icons" style="font-size:14px;">content_copy</span> Clone</button>
+      </div>
+    </div>
+    <!-- Card 4 -->
+    <div class="v2-card">
+      <div class="v2-card-top">
+        <div class="v2-card-icon"><span class="material-icons">lock</span></div>
+        <div class="v2-card-chevron" style="color:var(--text-muted);font-size:13px;">▸ 4 VPS</div>
+      </div>
+      <div class="v2-card-title">UFW Hardening</div>
+      <div class="v2-card-desc">Configure UFW defaults, allow HTTP/HTTPS/SSH, enable firewall</div>
+      <div class="v2-card-tags">
+        <span class="v2-tag danger">Security</span>
+        <span class="v2-tag warning">System</span>
+      </div>
+      <div class="v2-card-meta">
+        <span>⏱ 30s</span>
+        <span>🔁 12 runs</span>
+        <span>3d ago</span>
+      </div>
+      <div class="v2-card-actions">
+        <button class="btn btn-primary btn-sm" onclick="simulateRun()"><span class="material-icons" style="font-size:14px;">play_arrow</span> Run</button>
+        <button class="btn btn-sm"><span class="material-icons" style="font-size:14px;">edit</span> Edit</button>
+        <button class="btn btn-sm"><span class="material-icons" style="font-size:14px;">content_copy</span> Clone</button>
+      </div>
+    </div>
+    <!-- Card 5 -->
+    <div class="v2-card">
+      <div class="v2-card-top">
+        <div class="v2-card-icon"><span class="material-icons">monitor_heart</span></div>
+        <div class="v2-card-chevron" style="color:var(--text-muted);font-size:13px;">▸ 7 VPS</div>
+      </div>
+      <div class="v2-card-title">Health Check</div>
+      <div class="v2-card-desc">Comprehensive health check: disk usage, memory, running services, open ports</div>
+      <div class="v2-card-tags">
+        <span class="v2-tag info">Monitoring</span>
+        <span class="v2-tag success">Safe</span>
+      </div>
+      <div class="v2-card-meta">
+        <span>⏱ 15s</span>
+        <span>🔁 89 runs</span>
+        <span>30m ago</span>
+      </div>
+      <div class="v2-card-actions">
+        <button class="btn btn-primary btn-sm" onclick="simulateRun()"><span class="material-icons" style="font-size:14px;">play_arrow</span> Run</button>
+        <button class="btn btn-sm"><span class="material-icons" style="font-size:14px;">edit</span> Edit</button>
+        <button class="btn btn-sm"><span class="material-icons" style="font-size:14px;">content_copy</span> Clone</button>
+      </div>
+    </div>
+    <!-- Card 6 (empty state) -->
+    <div class="v2-card" style="border-style:dashed;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;gap:8px;cursor:pointer;" onclick="openModal()">
+      <span class="material-icons" style="font-size:32px;color:var(--text-muted);">add_circle_outline</span>
+      <span style="font-weight:600;color:var(--text-secondary);">Create New Script</span>
+      <span style="font-size:12px;color:var(--text-muted);">Save commands to run on your VPS</span>
+    </div>
+  </div>
+
+  <!-- Run history -->
+  <div style="margin-top:32px;">
+    <h3 style="font-size:14px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+      <span class="material-icons" style="font-size:18px;">history</span> Recent Runs
+    </h3>
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <tr style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);">
+          <th style="padding:10px 16px;text-align:left;">Script</th>
+          <th style="padding:10px 16px;text-align:left;">VPS</th>
+          <th style="padding:10px 16px;text-align:left;">Status</th>
+          <th style="padding:10px 16px;text-align:left;">Duration</th>
+          <th style="padding:10px 16px;text-align:left;">Ran by</th>
+          <th style="padding:10px 16px;text-align:left;">When</th>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border-light);">
+          <td style="padding:10px 16px;">System Update</td>
+          <td style="padding:10px 16px;color:var(--text-secondary);font-family:var(--mono);font-size:12px;">prod-web-01</td>
+          <td style="padding:10px 16px;"><span class="v3-status running">Success</span></td>
+          <td style="padding:10px 16px;">1m 24s</td>
+          <td style="padding:10px 16px;">admin</td>
+          <td style="padding:10px 16px;color:var(--text-secondary);">2h ago</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border-light);">
+          <td style="padding:10px 16px;">Health Check</td>
+          <td style="padding:10px 16px;color:var(--text-secondary);font-family:var(--mono);font-size:12px;">staging-01</td>
+          <td style="padding:10px 16px;"><span class="v3-status running">Success</span></td>
+          <td style="padding:10px 16px;">12s</td>
+          <td style="padding:10px 16px;">system</td>
+          <td style="padding:10px 16px;color:var(--text-secondary);">30m ago</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 16px;">DB Backup</td>
+          <td style="padding:10px 16px;color:var(--text-secondary);font-family:var(--mono);font-size:12px;">prod-db-01</td>
+          <td style="padding:10px 16px;"><span class="v3-status error">Failed</span></td>
+          <td style="padding:10px 16px;">42s</td>
+          <td style="padding:10px 16px;">admin</td>
+          <td style="padding:10px 16px;color:var(--text-secondary);">6h ago</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- Variant 3: Terminal Panel           -->
+<!-- ═══════════════════════════════════ -->
+<div class="tab-panel" id="v3">
+<div class="v3-layout">
+
+  <div class="v3-main">
+    <div class="v3-toolbar">
+      <h2><span class="material-icons" style="font-size:18px;vertical-align:text-bottom;color:var(--amber-400);">terminal</span> Script Library</h2>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="tabs">
+          <button class="active">All</button>
+          <button>System</button>
+          <button>Docker</button>
+          <button>DB</button>
+          <button>Security</button>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openModal()"><span class="material-icons" style="font-size:14px;">add</span> New</button>
+      </div>
+    </div>
+
+    <div class="v3-table-wrap">
+      <table class="v3-table">
+        <thead>
+          <tr>
+            <th style="width:30px;"><input type="checkbox" style="accent-color:var(--amber-500);"></th>
+            <th>Name</th>
+            <th>Command</th>
+            <th>Category</th>
+            <th>Runs</th>
+            <th>Status</th>
+            <th style="width:100px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><input type="checkbox" checked style="accent-color:var(--amber-500);"></td>
+            <td>
+              <div class="col-name">
+                <span class="material-icons">terminal</span>
+                <span>System Update</span>
+              </div>
+            </td>
+            <td><span class="col-cmd">apt update && apt upgrade -y && apt autoremove -y</span></td>
+            <td><span class="v2-tag warning">System</span></td>
+            <td style="color:var(--text-secondary);">47</td>
+            <td><span class="v3-status idle">Idle</span></td>
+            <td>
+              <div class="v3-actions">
+                <button class="btn-icon" title="Run" onclick="simulateRunV3()"><span class="material-icons" style="font-size:16px;">play_arrow</span></button>
+                <button class="btn-icon" title="Edit" onclick="openModal()"><span class="material-icons" style="font-size:16px;">edit</span></button>
+                <button class="btn-icon" title="Schedule"><span class="material-icons" style="font-size:16px;">schedule</span></button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" style="accent-color:var(--amber-500);"></td>
+            <td>
+              <div class="col-name">
+                <span class="material-icons">inventory_2</span>
+                <span>Docker Cleanup</span>
+              </div>
+            </td>
+            <td><span class="col-cmd">docker system prune -af --volumes && docker image ls -q</span></td>
+            <td><span class="v2-tag info">Docker</span></td>
+            <td style="color:var(--text-secondary);">23</td>
+            <td><span class="v3-status idle">Idle</span></td>
+            <td>
+              <div class="v3-actions">
+                <button class="btn-icon" title="Run" onclick="simulateRunV3()"><span class="material-icons" style="font-size:16px;">play_arrow</span></button>
+                <button class="btn-icon" title="Edit"><span class="material-icons" style="font-size:16px;">edit</span></button>
+                <button class="btn-icon" title="Schedule"><span class="material-icons" style="font-size:16px;">schedule</span></button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" style="accent-color:var(--amber-500);"></td>
+            <td>
+              <div class="col-name">
+                <span class="material-icons">storage</span>
+                <span>DB Backup</span>
+              </div>
+            </td>
+            <td><span class="col-cmd">pg_dumpall -U postgres | gzip &gt; /backups/db-$(date +%Y%m%d).sql.gz</span></td>
+            <td><span class="v2-tag warning">Database</span></td>
+            <td style="color:var(--text-secondary);">18</td>
+            <td><span class="v3-status error">Error</span></td>
+            <td>
+              <div class="v3-actions">
+                <button class="btn-icon" title="Run" onclick="simulateRunV3()"><span class="material-icons" style="font-size:16px;">play_arrow</span></button>
+                <button class="btn-icon" title="Edit"><span class="material-icons" style="font-size:16px;">edit</span></button>
+                <button class="btn-icon" title="Schedule"><span class="material-icons" style="font-size:16px;">schedule</span></button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" style="accent-color:var(--amber-500);"></td>
+            <td>
+              <div class="col-name">
+                <span class="material-icons">lock</span>
+                <span>UFW Hardening</span>
+              </div>
+            </td>
+            <td><span class="col-cmd">ufw default deny && ufw allow ssh && ufw enable</span></td>
+            <td><span class="v2-tag danger">Security</span></td>
+            <td style="color:var(--text-secondary);">12</td>
+            <td><span class="v3-status idle">Idle</span></td>
+            <td>
+              <div class="v3-actions">
+                <button class="btn-icon" title="Run" onclick="simulateRunV3()"><span class="material-icons" style="font-size:16px;">play_arrow</span></button>
+                <button class="btn-icon" title="Edit"><span class="material-icons" style="font-size:16px;">edit</span></button>
+                <button class="btn-icon" title="Schedule"><span class="material-icons" style="font-size:16px;">schedule</span></button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" style="accent-color:var(--amber-500);"></td>
+            <td>
+              <div class="col-name">
+                <span class="material-icons">monitor_heart</span>
+                <span>Health Check</span>
+              </div>
+            </td>
+            <td><span class="col-cmd">df -h && free -h && systemctl is-active --quiet docker && ss -tulpn</span></td>
+            <td><span class="v2-tag info">Monitoring</span></td>
+            <td style="color:var(--text-secondary);">89</td>
+            <td><span class="v3-status running">Running</span></td>
+            <td>
+              <div class="v3-actions">
+                <button class="btn-icon" title="Stop"><span class="material-icons" style="font-size:16px;color:var(--rose-400);">stop</span></button>
+                <button class="btn-icon" title="View output"><span class="material-icons" style="font-size:16px;">visibility</span></button>
+                <button class="btn-icon" title="Schedule"><span class="material-icons" style="font-size:16px;">schedule</span></button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" style="accent-color:var(--amber-500);"></td>
+            <td>
+              <div class="col-name">
+                <span class="material-icons">refresh</span>
+                <span>Restart Services</span>
+              </div>
+            </td>
+            <td><span class="col-cmd">systemctl restart nginx docker sshd && systemctl status nginx --no-pager</span></td>
+            <td><span class="v2-tag warning">System</span></td>
+            <td style="color:var(--text-secondary);">34</td>
+            <td><span class="v3-status idle">Idle</span></td>
+            <td>
+              <div class="v3-actions">
+                <button class="btn-icon" title="Run" onclick="simulateRunV3()"><span class="material-icons" style="font-size:16px;">play_arrow</span></button>
+                <button class="btn-icon" title="Edit"><span class="material-icons" style="font-size:16px;">edit</span></button>
+                <button class="btn-icon" title="Schedule"><span class="material-icons" style="font-size:16px;">schedule</span></button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Terminal output panel -->
+    <div class="v3-bottom">
+      <div class="v3-bottom-header">
+        <div class="tabs">
+          <span class="active">Output — Health Check (prod-web-01)</span>
+          <span>Run History</span>
+          <span>Variables</span>
+        </div>
+        <span style="display:flex;gap:12px;">
+          <span class="material-icons" style="font-size:14px;cursor:pointer;">close_fullscreen</span>
+          <span class="material-icons" style="font-size:14px;cursor:pointer;">minimize</span>
+        </span>
+      </div>
+      <div class="v3-terminal" id="v3Terminal">
+        <span class="prompt">$</span> Running Health Check on prod-web-01...<br>
+        <span class="prompt">$</span> df -h<br>
+        <span class="output">Filesystem      Size  Used Avail Use% Mounted on<br>
+/dev/sda1       196G   85G  111G  44% /<br></span>
+        <span class="prompt">$</span> free -h<br>
+        <span class="output">              total        used        free<br>
+Mem:           15Gi        8.2Gi       6.8Gi<br></span>
+        <span class="prompt">$</span> systemctl is-active --quiet docker<br>
+        <span class="output">active</span><br>
+        <span class="prompt">$</span> ss -tulpn | grep LISTEN<br>
+        <span class="output">tcp   LISTEN 0   128   0.0.0.0:22      0.0.0.0:*<br>
+tcp   LISTEN 0   128   0.0.0.0:443     0.0.0.0:*<br>
+tcp   LISTEN 0   128   0.0.0.0:80      0.0.0.0:*</span><br>
+        <span style="color:var(--emerald-400);">✔ Health Check completed — all services healthy</span>
+      </div>
+      <div class="v3-terminal-input">
+        <span class="prompt">▸</span>
+        <input type="text" value="docker ps --format 'table {{.Names}}\t{{.Status}}'" readonly>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══ Modal (shared) ═══ -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><span class="material-icons" style="font-size:18px;vertical-align:text-bottom;color:var(--amber-400);">add</span> New Script</h3>
+      <button class="modal-close" onclick="closeModal()"><span class="material-icons">close</span></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Script Name</label>
+        <input type="text" value="Disk Usage Alert" placeholder="e.g. Disk Usage Alert">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Category</label>
+          <select><option>System</option><option selected>Docker</option><option>Database</option><option>Security</option><option>Monitoring</option></select>
+        </div>
+        <div class="form-group">
+          <label>Run as</label>
+          <select><option>root</option><option>sudo</option><option selected>current user</option></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Command / Script</label>
+        <textarea>#!/bin/bash
+# Send alert when disk usage exceeds threshold
+THRESHOLD=85
+df -h | grep -vE '^Filesystem|tmpfs|devtmpfs' | awk '{print $5 " " $1 " " $6}' | while read output; do
+  usage=$(echo $output | awk '{print $1}' | cut -d'%' -f1)
+  partition=$(echo $output | awk '{print $3}')
+  if [ $usage -ge $THRESHOLD ]; then
+    echo "⚠️  Warning: $partition is at ${usage}%"
+  fi
+done</textarea>
+        <div class="hint">Accepts bash, sh, or any shell command. Multi-line scripts supported.</div>
+      </div>
+      <div class="form-group">
+        <label>Target VPS</label>
+        <select multiple style="min-height:90px;">
+          <option selected>prod-web-01</option>
+          <option selected>prod-api-02</option>
+          <option>staging-01</option>
+          <option selected>prod-db-01</option>
+          <option>dev-01</option>
+          <option>monitoring-01</option>
+        </select>
+        <div class="hint">Ctrl+click to select multiple VPS. Leave empty to choose at run time.</div>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" placeholder="Brief description of what this script does" value="Alert when disk usage exceeds 85% on any partition">
+      </div>
+      <div class="form-group" style="display:flex;gap:10px;align-items:center;">
+        <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" checked style="accent-color:var(--amber-500);">
+          <span>Requires root/sudo</span>
+        </label>
+        <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" style="accent-color:var(--amber-500);">
+          <span>Schedule recurring</span>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="closeModal()">Save Script</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById(this.dataset.tab).classList.add('active');
+  });
+});
+
+// Modal
+function openModal() { document.getElementById('modalOverlay').classList.add('open'); }
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// Simulate run (V1)
+function simulateRun() {
+  const body = document.getElementById('v1OutputBody');
+  body.innerHTML = '<span style="color:var(--amber-400);">▶ Running System Update...</span><br>' + body.innerHTML;
+  setTimeout(() => {
+    body.innerHTML = '<span style="color:var(--emerald-400);">✔ Running on prod-web-01, prod-api-02, staging-01...</span><br>' + body.innerHTML;
+  }, 300);
+  setTimeout(() => {
+    body.innerHTML = 'Reading package lists... Done<br>' + body.innerHTML;
+  }, 600);
+}
+
+// Simulate run (V3)
+function simulateRunV3() {
+  const term = document.getElementById('v3Terminal');
+  term.innerHTML = '<span class="prompt">$</span> <span style="color:var(--amber-400);">▶ Queued...</span><br><span class="prompt">$</span> <span style="color:var(--emerald-400);">✔ Started on prod-web-01</span><br>' + term.innerHTML;
+}
+</script>
+
+</body>
+</html>
