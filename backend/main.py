@@ -45,7 +45,7 @@ SESSION_SECRET = os.environ.get("SECRET_KEY", "change-me-to-random-secret")
 DASHBOARD_USER = os.environ.get("DASHBOARD_USER", "changeme")
 DASHBOARD_PASS = os.environ.get("DASHBOARD_PASS", "changeme")
 
-app = FastAPI(title="VPS Dashboard", version="2.1.0")
+app = FastAPI(title="ServerSphere", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=[], allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
 # SECURITY: Restrict allow_origins to your deployment domain in production, e.g.:
 # allow_origins=["https://your-domain.com"],
