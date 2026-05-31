@@ -3463,9 +3463,11 @@ function renderScriptCards(scripts) {
                 <span><span class="material-icons" style="font-size:14px;vertical-align:middle">schedule</span> ${lastRun}</span>
             </div>
             <div style="padding:8px 16px;border-top:1px solid var(--border);display:flex;gap:6px;">
+                <button class="btn btn-sm btn-ghost" onclick="openScriptView('${s.id}')"><span class="material-icons" style="font-size:14px">visibility</span> View</button>
                 ${canRun ? `<button class="btn btn-sm btn-primary" onclick="openScriptRun('${s.id}')"><span class="material-icons" style="font-size:14px">play_arrow</span> Run</button>` : ''}
                 ${canEdit ? `<button class="btn btn-sm" onclick="openScriptForm('${s.id}')"><span class="material-icons" style="font-size:14px">edit</span> Edit</button>` : ''}
                 ${canEdit ? `<button class="btn btn-sm" onclick="duplicateScript('${s.id}')"><span class="material-icons" style="font-size:14px">content_copy</span> Clone</button>` : ''}
+                ${canEdit ? `<button class="btn btn-sm btn-danger" onclick="deleteScript('${s.id}')"><span class="material-icons" style="font-size:14px">delete</span> Delete</button>` : ''}
             </div>
         </div>`;
     }).join('');
@@ -3497,6 +3499,61 @@ function renderScriptRuns(runs) {
             <td style="font-size:12px;color:var(--text-muted)">${esc(triggeredBy)}</td>
         </tr>`;
     }).join('');
+}
+
+// ─── Script View Modal ─────────────────────────────────────
+
+function openScriptView(scriptId) {
+    const modal = document.getElementById('scriptViewModal');
+    const titleEl = document.getElementById('scriptViewTitle');
+    const descEl = document.getElementById('scriptViewDescription');
+    const cmdEl = document.getElementById('scriptViewCommand');
+    const catTag = document.getElementById('scriptViewCategoryTag');
+    const statsEl = document.getElementById('scriptViewStats');
+    const runAsEl = document.getElementById('scriptViewRunAs');
+    const timeoutEl = document.getElementById('scriptViewTimeout');
+    const rootEl = document.getElementById('scriptViewRoot');
+
+    // Reset
+    titleEl.textContent = 'Loading...';
+    descEl.textContent = '';
+    cmdEl.value = '';
+    catTag.textContent = '...';
+    statsEl.textContent = '';
+    modal.classList.remove('hidden');
+
+    (async () => {
+        try {
+            const s = await api('GET', `/scripts/${scriptId}`);
+            titleEl.textContent = s.name || s.title || 'Untitled';
+            descEl.textContent = s.description || 'No description';
+            cmdEl.value = s.command || s.content || '';
+            catTag.textContent = s.category || 'Custom';
+
+            const cat = s.category || 'Custom';
+            const catClass = getScriptCategoryClass(cat);
+            if (catClass) {
+                catTag.className = `tag tag-${catClass}`;
+            } else {
+                catTag.className = 'tag';
+            }
+
+            const runCount = s.run_count !== undefined ? s.run_count : 0;
+            const lastRun = s.last_run ? timeAgo(s.last_run) : 'never';
+            statsEl.textContent = `${runCount} runs · last ${lastRun}`;
+
+            runAsEl.innerHTML = `<span class="material-icons" style="font-size:14px;vertical-align:middle">person</span> Run as: ${s.run_as || 'current_user'}`;
+            timeoutEl.innerHTML = `<span class="material-icons" style="font-size:14px;vertical-align:middle">timer</span> Timeout: ${s.timeout || 30}s`;
+            rootEl.innerHTML = `<span class="material-icons" style="font-size:14px;vertical-align:middle">security</span> Root: ${s.requires_root ? 'Yes' : 'No'}`;
+        } catch (err) {
+            showToast('Failed to load script: ' + err.message, 'error');
+            closeScriptView();
+        }
+    })();
+}
+
+function closeScriptView() {
+    document.getElementById('scriptViewModal').classList.add('hidden');
 }
 
 // ─── CRUD Functions ────────────────────────────────────────
