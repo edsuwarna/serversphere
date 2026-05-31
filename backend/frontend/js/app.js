@@ -3299,6 +3299,40 @@ function getScriptCategoryClass(category) {
     return classes[category] || '';
 }
 
+// ─── Category helpers ──────────────────────────────────────
+
+async function loadCategories() {
+    try {
+        const res = await api('GET', '/scripts/categories');
+        return res.categories || [];
+    } catch (err) {
+        console.error('Failed to load categories:', err);
+        return ['System', 'Docker', 'Database', 'Security', 'Monitoring', 'Custom'];
+    }
+}
+
+function populateCategoryDropdown(selectEl, selectedValue) {
+    if (!selectEl) return;
+    loadCategories().then(categories => {
+        const currentVal = selectedValue || 'Custom';
+        let html = categories.map(c =>
+            `<option value="${esc(c)}" ${c === currentVal ? 'selected' : ''}>${esc(c)}</option>`
+        ).join('');
+        html += `<option value="__new__">+ New Category...</option>`;
+        selectEl.innerHTML = html;
+        selectEl.value = currentVal;
+
+        // Show/hide new category input
+        handleCategorySelectChange(selectEl);
+    });
+}
+
+function handleCategorySelectChange(selectEl) {
+    const wrapper = document.getElementById('scriptNewCategoryWrapper');
+    if (!wrapper) return;
+    wrapper.style.display = selectEl.value === '__new__' ? 'block' : 'none';
+}
+
 function formatDuration(ms) {
     if (!ms && ms !== 0) return '-';
     if (ms < 1000) return ms + 'ms';
@@ -3332,7 +3366,8 @@ async function loadScripts() {
     try {
         const scripts = await api('GET', '/scripts');
         const total = scripts.length || 0;
-        document.getElementById('totalScripts').textContent = total;
+        const totalEl = document.getElementById('totalScripts');
+        if (totalEl) totalEl.textContent = total;
 
         // Count by category for stats
         const catCount = {};
@@ -3352,9 +3387,27 @@ async function loadScripts() {
         if (statsEl) statsEl.innerHTML = statHtml;
 
         renderScriptCards(scripts);
+
+        // Populate filter category dropdown from API
+        populateFilterCategories();
     } catch (err) {
         console.error('loadScripts error:', err);
         showToast('Failed to load scripts: ' + err.message, 'error');
+    }
+}
+
+async function populateFilterCategories() {
+    const filterSelect = document.getElementById('scriptCategoryFilter');
+    if (!filterSelect) return;
+    try {
+        const res = await api('GET', '/scripts/categories');
+        const cats = res.categories || [];
+        const currentVal = filterSelect.value || '';
+        filterSelect.innerHTML = '<option value="">All Categories</option>' +
+            cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+        filterSelect.value = currentVal;
+    } catch (err) {
+        // Fallback — already hardcoded in HTML
     }
 }
 
@@ -3390,7 +3443,12 @@ function renderScriptCards(scripts) {
         const lastRun = s.last_run ? timeAgo(s.last_run) : 'never';
         const canRun = isOperator();
         const canEdit = isAdmin();
-        return `<div class="vps-card">
+        return `<div class="vps-card script-card"
+                data-name="${esc(s.name || '')}"
+                data-desc="${esc(s.description || '')}"
+                data-category="${esc(cat)}"
+                data-sort="${s.created_at || 0}"
+                data-runs="${runCount}">
             <div class="vps-card-header">
                 <div class="vps-card-name">
                     <span class="material-icons" style="font-size:20px;margin-right:8px;color:var(--${catClass || 'text-muted'})">${icon}</span>
@@ -3445,22 +3503,33 @@ function renderScriptRuns(runs) {
 
 function openScriptForm(scriptId) {
     const modal = document.getElementById('scriptFormModal');
-    const titleEl = document.getElementById('scriptFormTitle');
+    const titleEl = document.getElementById('scriptFormModalTitle');
     const idField = document.getElementById('scriptFormId');
     const nameField = document.getElementById('scriptFormName');
     const descField = document.getElementById('scriptFormDescription');
-    const contentField = document.getElementById('scriptFormContent');
+    const contentField = document.getElementById('scriptFormCommand');
     const categoryField = document.getElementById('scriptFormCategory');
-    const tagsField = document.getElementById('scriptFormTags');
+    const newCatWrapper = document.getElementById('scriptNewCategoryWrapper');
+    const newCatInput = document.getElementById('scriptNewCategoryInput');
+    const runAsField = document.getElementById('scriptFormRunAs');
+    const timeoutField = document.getElementById('scriptFormTimeout');
+    const requiresRootField = document.getElementById('scriptFormRequiresRoot');
 
     // Reset form
     nameField.value = '';
     descField.value = '';
     contentField.value = '';
     categoryField.value = 'Custom';
-    tagsField.value = '';
     idField.value = '';
     titleEl.textContent = 'Create Script';
+    if (newCatWrapper) newCatWrapper.style.display = 'none';
+    if (newCatInput) newCatInput.value = '';
+    if (runAsField) runAsField.value = 'current_user';
+    if (timeoutField) timeoutField.value = '30';
+    if (requiresRootField) requiresRootField.checked = false;
+
+    // Populate category dropdown dynamically
+    populateCategoryDropdown(categoryField, 'Custom');
 
     if (scriptId) {
         titleEl.textContent = 'Edit Script';
@@ -3471,9 +3540,12 @@ function openScriptForm(scriptId) {
                 idField.value = s.id;
                 nameField.value = s.name || s.title || '';
                 descField.value = s.description || '';
-                contentField.value = s.content || '';
-                categoryField.value = s.category || 'Custom';
-                tagsField.value = (s.tags && s.tags.length) ? s.tags.join(', ') : '';
+                contentField.value = s.command || s.content || '';
+                if (runAsField) runAsField.value = s.run_as || 'current_user';
+                if (timeoutField) timeoutField.value = String(s.timeout || '30');
+                if (requiresRootField) requiresRootField.checked = !!s.requires_root;
+                // Populate dropdown with current category selected
+                populateCategoryDropdown(categoryField, s.category || 'Custom');
             } catch (err) {
                 showToast('Failed to load script: ' + err.message, 'error');
                 return;
@@ -3487,9 +3559,13 @@ async function saveScript() {
     const idField = document.getElementById('scriptFormId');
     const nameField = document.getElementById('scriptFormName');
     const descField = document.getElementById('scriptFormDescription');
-    const contentField = document.getElementById('scriptFormContent');
+    const contentField = document.getElementById('scriptFormCommand');
     const categoryField = document.getElementById('scriptFormCategory');
-    const tagsField = document.getElementById('scriptFormTags');
+    const newCatWrapper = document.getElementById('scriptNewCategoryWrapper');
+    const newCatInput = document.getElementById('scriptNewCategoryInput');
+    const runAsField = document.getElementById('scriptFormRunAs');
+    const timeoutField = document.getElementById('scriptFormTimeout');
+    const requiresRootField = document.getElementById('scriptFormRequiresRoot');
 
     const name = nameField.value.trim();
     const content = contentField.value.trim();
@@ -3499,17 +3575,32 @@ async function saveScript() {
         return;
     }
     if (!content) {
-        showToast('Script content is required', 'warning');
+        showToast('Script command is required', 'warning');
         contentField.focus();
         return;
+    }
+
+    // Check if a new category was typed
+    let category = categoryField.value || 'Custom';
+    if (category === '__new__' && newCatInput) {
+        const newCat = newCatInput.value.trim();
+        if (newCat) {
+            category = newCat;
+        } else {
+            showToast('Please enter a category name', 'warning');
+            newCatInput.focus();
+            return;
+        }
     }
 
     const data = {
         name: name,
         description: descField.value.trim(),
-        content: content,
-        category: categoryField.value || 'Custom',
-        tags: tagsField.value.split(',').map(t => t.trim()).filter(Boolean),
+        command: content,
+        category: category,
+        run_as: runAsField ? runAsField.value : 'current_user',
+        timeout: timeoutField ? parseInt(timeoutField.value) || 300 : 300,
+        requires_root: requiresRootField ? requiresRootField.checked : false,
     };
 
     const btn = document.querySelector('#scriptFormModal .btn-primary');

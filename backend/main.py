@@ -2359,6 +2359,44 @@ async def list_scripts(request: Request):
         db.close()
 
 
+@app.get("/api/scripts/categories")
+async def list_script_categories(request: Request):
+    user = require_auth(request)
+    db = SessionLocal()
+    try:
+        results = db.query(ScriptModel.category).distinct().order_by(ScriptModel.category).all()
+        categories = [r[0] for r in results if r[0]]
+        defaults = ["System", "Docker", "Database", "Security", "Monitoring", "Custom"]
+        merged = list(dict.fromkeys(defaults + categories))
+        return {"categories": merged}
+    finally:
+        db.close()
+
+
+@app.get("/api/scripts/runs")
+async def list_script_runs(request: Request, limit: int = 50):
+    user = require_auth(request)
+    db = SessionLocal()
+    try:
+        runs = db.query(ScriptRunModel).order_by(ScriptRunModel.started_at.desc()).limit(limit).all()
+        return [_run_to_dict(r) for r in runs]
+    finally:
+        db.close()
+
+
+@app.get("/api/scripts/runs/{run_id}")
+async def get_script_run(run_id: str, request: Request):
+    user = require_auth(request)
+    db = SessionLocal()
+    try:
+        run = db.query(ScriptRunModel).filter(ScriptRunModel.id == run_id).first()
+        if not run:
+            raise HTTPException(status_code=404, detail="Run not found")
+        return _run_to_dict(run)
+    finally:
+        db.close()
+
+
 @app.post("/api/scripts", status_code=201)
 async def create_script(data: ScriptCreate, request: Request):
     user = require_auth(request)
@@ -2598,30 +2636,6 @@ async def _run_on_vps_async(script: ScriptModel, vps_id: str, command: str, time
         return {"vps_id": vps_id, "vps_name": vps_id, "success": False, "error": str(e.detail), "exec_time_ms": 0}
     except Exception as e:
         return {"vps_id": vps_id, "vps_name": vps_id, "success": False, "error": str(e)[:300], "exec_time_ms": 0}
-
-
-@app.get("/api/scripts/runs")
-async def list_script_runs(request: Request, limit: int = 50):
-    user = require_auth(request)
-    db = SessionLocal()
-    try:
-        runs = db.query(ScriptRunModel).order_by(ScriptRunModel.started_at.desc()).limit(limit).all()
-        return [_run_to_dict(r) for r in runs]
-    finally:
-        db.close()
-
-
-@app.get("/api/scripts/runs/{run_id}")
-async def get_script_run(run_id: str, request: Request):
-    user = require_auth(request)
-    db = SessionLocal()
-    try:
-        run = db.query(ScriptRunModel).filter(ScriptRunModel.id == run_id).first()
-        if not run:
-            raise HTTPException(status_code=404, detail="Run not found")
-        return _run_to_dict(run)
-    finally:
-        db.close()
 
 
 # ═══════════════════════════════════════════════════════════════
