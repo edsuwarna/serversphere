@@ -35,13 +35,12 @@ image: ghcr.io/edsuwarna/serversphere:TAG
 
 | Tag | Points to | Pushed by | When to use |
 |-----|-----------|-----------|-------------|
-| `latest` | Latest stable release | Release workflow | Production — you want the most recent stable version |
-| `stable` | Same as `latest` | Release workflow | Production — explicit alias for `latest` |
+| `latest` | Latest stable release | Release workflow | Production — most recent stable version |
 | `0.1.0` | This exact release | Release workflow | Pin to a specific version |
 | `edge` | Latest commit on `main` | Main-build workflow | Testing / staging — bleeding edge |
 | `sha-xxxxxxx` | A specific commit | Main-build workflow | Rollback / debugging |
 
-> **💡 Pro-tip:** Use `ghcr.io/edsuwarna/serversphere:stable` in production. It always points to the latest tagged release and won't be overwritten by main-branch builds.
+> **💡 Pro-tip:** Use `ghcr.io/edsuwarna/serversphere:latest` in production. It always points to the latest tagged release and won't be overwritten by main-branch builds.
 
 ## For who?
 

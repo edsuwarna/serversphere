@@ -33,12 +33,11 @@ image: ghcr.io/edsuwarna/serversphere:TAG
 | Tag | Nunjuk ke | Dipasang oleh | Kapan pakenya |
 |-----|-----------|---------------|--------------|
 | `latest` | Rilis stabil terbaru | Release workflow | Production — versi stabil paling baru |
-| `stable` | Sama kayak `latest` | Release workflow | Production — alias eksplisit `latest` |
 | `0.1.0` | Rilis ini | Release workflow | Pin ke versi tertentu |
 | `edge` | Commit terakhir di `main` | Main-build workflow | Testing / staging — fitur terbaru |
 | `sha-xxxxxxx` | Commit spesifik | Main-build workflow | Rollback / debugging |
 
-> **💡 Tips:** Pake `ghcr.io/edsuwarna/serversphere:stable` di production. Selalu nunjuk ke rilis stabil tanpa ke-*overwrite* sama build dari main.
+> **💡 Tips:** Pake `ghcr.io/edsuwarna/serversphere:latest` di production. Selalu nunjuk ke rilis stabil tanpa ke-*overwrite* sama build dari main.
 
 ## Tech
 
