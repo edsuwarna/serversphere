@@ -164,6 +164,8 @@ class Script(Base):
     run_as = Column(String(32), default="current_user")  # root, sudo, current_user
     requires_root = Column(Boolean, default=False)
     timeout = Column(Integer, default=300)
+    pinned = Column(Boolean, default=False)
+    tags = Column(Text, default="[]")  # JSON-encoded list of tag strings
     created_by = Column(String(32), ForeignKey("users.id"), nullable=True)
     created_at = Column(Float, default=time.time)
     updated_at = Column(Float, default=time.time, onupdate=time.time)
@@ -236,6 +238,21 @@ def init_db():
                 print("[Migration] Added oidc_sub column to users for OIDC/SSO")
     except Exception as e:
         print(f"[Migration] oidc_sub column (may already exist): {e}")
+
+    # Migration: add pinned + tags to scripts for Script Library improvements
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name='scripts' AND column_name='pinned'"
+            ))
+            if not result.fetchone():
+                conn.execute(text("ALTER TABLE scripts ADD COLUMN pinned BOOLEAN DEFAULT FALSE"))
+                conn.execute(text("ALTER TABLE scripts ADD COLUMN tags TEXT DEFAULT '[]'"))
+                conn.commit()
+                print("[Migration] Added pinned and tags columns to scripts")
+    except Exception as e:
+        print(f"[Migration] scripts pinned/tags (may already exist): {e}")
 
 
 def get_db():

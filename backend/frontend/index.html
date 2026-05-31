@@ -755,13 +755,46 @@
                 <div id="page-scripts" class="page">
                     <div class="page-header">
                         <h2>Script Library</h2>
-                        <button class="btn btn-primary" onclick="openScriptForm()">
-                            <span class="material-icons" style="font-size:18px">add</span> New Script
-                        </button>
+                        <div style="display:flex;gap:8px;">
+                            <button class="btn btn-secondary" onclick="importScriptFile()" id="importScriptBtn">
+                                <span class="material-icons" style="font-size:18px">file_upload</span> Import
+                            </button>
+                            <button class="btn btn-primary" onclick="openScriptForm()">
+                                <span class="material-icons" style="font-size:18px">add</span> New Script
+                            </button>
+                        </div>
                     </div>
                     <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;">
                         Create and manage reusable scripts to run across your VPS instances.
                     </p>
+
+                    <!-- Stats Cards -->
+                    <div class="stat-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;">
+                            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Total Scripts</div>
+                            <div style="font-size:22px;font-weight:700;margin-top:4px;" id="statTotalScripts">0</div>
+                        </div>
+                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;">
+                            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Total Runs</div>
+                            <div style="font-size:22px;font-weight:700;margin-top:4px;" id="statTotalRuns">0</div>
+                        </div>
+                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;">
+                            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Success Rate</div>
+                            <div style="font-size:22px;font-weight:700;margin-top:4px;" id="statSuccessRate">—</div>
+                        </div>
+                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;">
+                            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Avg Duration</div>
+                            <div style="font-size:22px;font-weight:700;margin-top:4px;" id="statAvgDuration">—</div>
+                        </div>
+                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;">
+                            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">⭐ Pinned</div>
+                            <div style="font-size:22px;font-weight:700;margin-top:4px;" id="statPinned">0</div>
+                        </div>
+                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;" id="statCategoryBreakdown">
+                            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Categories</div>
+                            <div id="scriptStats" style="font-size:12px;margin-top:6px;color:var(--text-secondary);line-height:1.6;"></div>
+                        </div>
+                    </div>
 
                     <!-- Filter Bar -->
                     <div class="filter-bar" style="display:flex;gap:12px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
@@ -1583,10 +1616,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeScriptForm()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveScript()">
                     <span class="material-icons" style="font-size:16px;">save</span> Save Script
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeScriptForm()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1616,6 +1649,15 @@
                         <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Loading VPS list...</div>
                     </div>
                 </div>
+
+                <!-- Script Variables Section (shown when script has {{VAR}} params) -->
+                <div id="scriptVarSection" style="display:none;margin-bottom:16px;">
+                    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:8px;">
+                        Script Parameters
+                    </label>
+                    <div id="scriptVarInputs" style="display:flex;flex-direction:column;gap:8px;"></div>
+                </div>
+
                 <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
                     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
                         <input type="checkbox" id="scriptRunSudo" style="width:16px;height:16px;accent-color:var(--primary);">
@@ -1639,10 +1681,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeScriptRunModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="executeScriptRun()">
                     <span class="material-icons" style="font-size:16px;">play_arrow</span> Run Script
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeScriptRunModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1668,8 +1710,7 @@
                 </div>
                 <div class="form-group" style="margin-top:12px;">
                     <label>Command</label>
-                    <textarea id="scriptViewCommand" readonly rows="8"
-                        style="width:100%;padding:10px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;resize:none;tab-size:2;"></textarea>
+                    <pre id="scriptViewCode" class="code-block"><code></code></pre>
                 </div>
                 <div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;font-size:12px;color:var(--text-muted);">
                     <span id="scriptViewRunAs"><span class="material-icons" style="font-size:14px;vertical-align:middle">person</span> Run as: current_user</span>
@@ -1682,6 +1723,48 @@
             </div>
         </div>
     </div>
+
+    <!-- ═══ Script Run Output Detail Modal ═══ -->
+    <div id="scriptOutputModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeScriptOutputModal()"></div>
+        <div class="modal-card modal-lg" style="max-width:800px;">
+            <div class="modal-header">
+                <h3 id="scriptOutputTitle">Run Output</h3>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span id="scriptOutputStatus" style="font-size:13px;font-weight:600;"></span>
+                    <span id="scriptOutputDuration" style="font-size:12px;color:var(--text-muted);"></span>
+                    <button class="modal-close" onclick="closeScriptOutputModal()">
+                        <span class="material-icons">close</span>
+                    </button>
+                </div>
+            </div>
+            <div style="padding:16px 24px;">
+                <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;font-size:13px;">
+                    <span id="scriptOutputVps" style="color:var(--text-secondary);"></span>
+                    <span id="scriptOutputScript" style="color:var(--text-secondary);"></span>
+                    <span id="scriptOutputTrigger" style="color:var(--text-muted);font-size:12px;"></span>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;display:flex;justify-content:space-between;">
+                    <span>Output</span>
+                    <button class="btn btn-sm btn-ghost" onclick="copyScriptOutput()" style="font-size:11px;padding:2px 8px;">
+                        <span class="material-icons" style="font-size:12px">content_copy</span> Copy
+                    </button>
+                </div>
+                <pre id="scriptOutputContent" class="code-block" style="max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;"><code></code></pre>
+                <div id="scriptOutputError" style="display:none;margin-top:12px;">
+                    <div style="font-size:11px;color:var(--danger);margin-bottom:4px;">Error</div>
+                    <pre id="scriptOutputErrorContent" class="code-block" style="border-left:3px solid var(--danger);max-height:200px;overflow-y:auto;"><code></code></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <span id="scriptOutputExitCode" style="font-size:12px;color:var(--text-muted);"></span>
+                <button type="button" class="btn btn-secondary" onclick="closeScriptOutputModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden file input for script import -->
+    <input type="file" id="scriptImportInput" accept=".json" style="display:none" onchange="onScriptImportFile(event)">
 
     <!-- ═══ Toast Container ═══ -->
     <div id="toastContainer"></div>
@@ -1696,8 +1779,8 @@
                 <div class="confirm-message" id="confirmMessage"></div>
             </div>
             <div class="modal-footer" style="justify-content:center;gap:12px;">
-                <button type="button" class="btn btn-secondary" onclick="closeConfirmModal()">Cancel</button>
                 <button type="button" class="btn btn-danger" id="confirmOkBtn" onclick="confirmOk()">Confirm</button>
+                <button type="button" class="btn btn-secondary" onclick="closeConfirmModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1719,6 +1802,6 @@
         </div>
     </div>
 
-    <script src="/js/app.js?v=22"></script>
+    <script src="/js/app.js?v=25"></script>
 </body>
 </html>

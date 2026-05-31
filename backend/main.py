@@ -2282,6 +2282,8 @@ class ScriptCreate(BaseModel):
     run_as: str = "current_user"
     requires_root: bool = False
     timeout: int = 300
+    tags: str = "[]"
+    pinned: bool = False
 
 
 class ScriptUpdate(BaseModel):
@@ -2292,12 +2294,15 @@ class ScriptUpdate(BaseModel):
     run_as: Optional[str] = None
     requires_root: Optional[bool] = None
     timeout: Optional[int] = None
+    tags: Optional[str] = None
+    pinned: Optional[bool] = None
 
 
 class ScriptRunRequest(BaseModel):
     vps_ids: List[str]
     parallel: bool = True
     timeout: Optional[int] = None
+    command_override: Optional[str] = None
 
 
 def _script_to_dict(s: ScriptModel) -> dict:
@@ -2310,6 +2315,8 @@ def _script_to_dict(s: ScriptModel) -> dict:
         "run_as": s.run_as,
         "requires_root": s.requires_root,
         "timeout": s.timeout,
+        "pinned": s.pinned,
+        "tags": s.tags if s.tags is not None else "[]",
         "created_by": s.created_by,
         "created_at": s.created_at,
         "updated_at": s.updated_at,
@@ -2339,7 +2346,12 @@ async def list_scripts(request: Request):
     user = require_auth(request)
     db = SessionLocal()
     try:
-        scripts = db.query(ScriptModel).order_by(ScriptModel.updated_at.desc()).all()
+        from sqlalchemy import func, case
+        # Pinned first, then by updated_at desc
+        scripts = db.query(ScriptModel).order_by(
+            case((ScriptModel.pinned == True, 0), else_=1),
+            ScriptModel.updated_at.desc()
+        ).all()
         result = []
         for s in scripts:
             sd = _script_to_dict(s)
@@ -2347,7 +2359,6 @@ async def list_scripts(request: Request):
             run_count = db.query(ScriptRunModel).filter(ScriptRunModel.script_id == s.id).count()
             sd["run_count"] = run_count
             sd["avg_exec_time_ms"] = None
-            from sqlalchemy import func
             avg_time = db.query(func.avg(ScriptRunModel.exec_time_ms)).filter(
                 ScriptRunModel.script_id == s.id,
                 ScriptRunModel.status == "success"
@@ -2411,6 +2422,8 @@ async def create_script(data: ScriptCreate, request: Request):
             run_as=data.run_as,
             requires_root=data.requires_root,
             timeout=data.timeout or 300,
+            pinned=data.pinned,
+            tags=data.tags,
             created_by=user["id"],
             created_at=time.time(),
             updated_at=time.time(),
@@ -2468,6 +2481,10 @@ async def update_script(script_id: str, data: ScriptUpdate, request: Request):
             script.requires_root = data.requires_root
         if data.timeout is not None:
             script.timeout = data.timeout
+        if data.tags is not None:
+            script.tags = data.tags
+        if data.pinned is not None:
+            script.pinned = data.pinned
         script.updated_at = time.time()
         db.commit()
         db.refresh(script)
@@ -2517,6 +2534,8 @@ async def duplicate_script(script_id: str, request: Request):
             run_as=original.run_as,
             requires_root=original.requires_root,
             timeout=original.timeout,
+            pinned=False,
+            tags=original.tags,
             created_by=user["id"],
             created_at=time.time(),
             updated_at=time.time(),
@@ -2548,7 +2567,7 @@ async def run_script(script_id: str, data: ScriptRunRequest, request: Request):
         timeout = data.timeout or script.timeout or 300
 
         results = []
-        command = script.command
+        command = data.command_override or script.command
 
         # for sudo mode, wrap command
         escaped = command.replace("'", "'\\''")
@@ -2636,6 +2655,325 @@ async def _run_on_vps_async(script: ScriptModel, vps_id: str, command: str, time
         return {"vps_id": vps_id, "vps_name": vps_id, "success": False, "error": str(e.detail), "exec_time_ms": 0}
     except Exception as e:
         return {"vps_id": vps_id, "vps_name": vps_id, "success": False, "error": str(e)[:300], "exec_time_ms": 0}
+
+
+# ═══════════════════════════════════════════════════════════════
+#  SCRIPT LIBRARY — NEW FEATURES
+# ═══════════════════════════════════════════════════════════════
+
+# Re-run: re-execute a previous run with same config
+class ScriptRerunRequest(BaseModel):
+    parallel: bool = True
+    timeout: Optional[int] = None
+
+
+@app.post("/api/scripts/{script_id}/re-run")
+async def rerun_script(script_id: str, data: ScriptRerunRequest, request: Request):
+    user = require_auth(request)
+    db = SessionLocal()
+    try:
+        script = db.query(ScriptModel).filter(ScriptModel.id == script_id).first()
+        if not script:
+            raise HTTPException(status_code=404, detail="Script not found")
+
+        # Get VPS from last run
+        last_run = db.query(ScriptRunModel).filter(
+            ScriptRunModel.script_id == script_id
+        ).order_by(ScriptRunModel.started_at.desc()).first()
+        if not last_run:
+            raise HTTPException(status_code=400, detail="No previous runs to re-run")
+
+        # Find all VPS IDs from the most recent run batch
+        recent_runs = db.query(ScriptRunModel).filter(
+            ScriptRunModel.script_id == script_id,
+            ScriptRunModel.started_at == last_run.started_at
+        ).all()
+        vps_ids = list(set(str(r.vps_id) for r in recent_runs))
+
+        # Reuse run_script logic
+        run_data = ScriptRunRequest(vps_ids=vps_ids, parallel=data.parallel, timeout=data.timeout)
+        return await run_script(script_id, run_data, request)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# Pin / Unpin
+@app.patch("/api/scripts/{script_id}/pin")
+async def toggle_pin_script(script_id: str, request: Request):
+    user = require_auth(request)
+    db = SessionLocal()
+    try:
+        script = db.query(ScriptModel).filter(ScriptModel.id == script_id).first()
+        if not script:
+            raise HTTPException(status_code=404, detail="Script not found")
+        script.pinned = not script.pinned
+        script.updated_at = time.time()
+        db.commit()
+        audit_log(request, "script_pin" if script.pinned else "script_unpin",
+                   resource_type="script", resource_id=script_id,
+                   details={"name": script.name, "pinned": script.pinned})
+        return {"pinned": script.pinned}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        db.close()
+
+
+# Export single script
+@app.get("/api/scripts/{script_id}/export")
+async def export_script(script_id: str, request: Request):
+    user = require_auth(request)
+    db = SessionLocal()
+    try:
+        script = db.query(ScriptModel).filter(ScriptModel.id == script_id).first()
+        if not script:
+            raise HTTPException(status_code=404, detail="Script not found")
+        sd = _script_to_dict(script)
+        return {
+            "version": "1",
+            "type": "serversphere-script",
+            "script": {
+                "name": sd["name"],
+                "description": sd["description"],
+                "category": sd["category"],
+                "command": sd["command"],
+                "run_as": sd["run_as"],
+                "requires_root": sd["requires_root"],
+                "timeout": sd["timeout"],
+                "tags": sd["tags"],
+            }
+        }
+    finally:
+        db.close()
+
+
+# Import script
+class ScriptImport(BaseModel):
+    name: str
+    description: str = ""
+    category: str = "Custom"
+    command: str
+    run_as: str = "current_user"
+    requires_root: bool = False
+    timeout: int = 300
+    tags: str = "[]"
+
+
+@app.post("/api/scripts/import", status_code=201)
+async def import_script(data: ScriptImport, request: Request):
+    user = require_auth(request)
+    db = SessionLocal()
+    try:
+        script = ScriptModel(
+            id=str(uuid.uuid4())[:8],
+            name=data.name,
+            description=data.description,
+            category=data.category,
+            command=data.command,
+            run_as=data.run_as,
+            requires_root=data.requires_root,
+            timeout=data.timeout or 300,
+            pinned=False,
+            tags=data.tags,
+            created_by=user["id"],
+            created_at=time.time(),
+            updated_at=time.time(),
+        )
+        db.add(script)
+        db.commit()
+        db.refresh(script)
+        audit_log(request, "script_import", resource_type="script", resource_id=script.id,
+                   details={"name": script.name})
+        return _script_to_dict(script)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        db.close()
+
+
+# Script stats
+@app.get("/api/scripts/stats")
+async def script_stats(request: Request):
+    user = require_auth(request)
+    db = SessionLocal()
+    try:
+        from sqlalchemy import func
+        total_scripts = db.query(ScriptModel).count()
+        total_runs = db.query(ScriptRunModel).count()
+        pinned_count = db.query(ScriptModel).filter(ScriptModel.pinned == True).count()
+        success_runs = db.query(ScriptRunModel).filter(ScriptRunModel.status == "success").count()
+        failed_runs = db.query(ScriptRunModel).filter(ScriptRunModel.status == "failed").count()
+
+        avg_duration = db.query(func.avg(ScriptRunModel.exec_time_ms)).filter(
+            ScriptRunModel.status == "success"
+        ).scalar()
+
+        # Per-category counts
+        categories = db.query(ScriptModel.category, func.count(ScriptModel.id)).group_by(ScriptModel.category).all()
+
+        return {
+            "total_scripts": total_scripts,
+            "total_runs": total_runs,
+            "pinned_count": pinned_count,
+            "success_runs": success_runs,
+            "failed_runs": failed_runs,
+            "success_rate": round((success_runs / total_runs * 100), 1) if total_runs > 0 else 0,
+            "avg_duration_ms": int(avg_duration) if avg_duration else 0,
+            "categories": {c: n for c, n in categories},
+        }
+    finally:
+        db.close()
+
+
+# Seed built-in templates
+BUILTIN_TEMPLATES = [
+    {
+        "name": "Docker System Prune",
+        "description": "Clean up unused Docker resources — containers, images, volumes, and build cache.",
+        "category": "Docker",
+        "command": "docker system prune -af --volumes",
+        "run_as": "sudo",
+        "requires_root": True,
+        "timeout": 120,
+        "tags": '["docker", "cleanup"]',
+    },
+    {
+        "name": "System Update",
+        "description": "Update all system packages via apt — equivalent to apt update && apt upgrade -y.",
+        "category": "System",
+        "command": "apt update && apt upgrade -y",
+        "run_as": "sudo",
+        "requires_root": True,
+        "timeout": 300,
+        "tags": '["system", "update"]',
+    },
+    {
+        "name": "Disk Usage Report",
+        "description": "Show disk usage for all mounted filesystems with human-readable sizes.",
+        "category": "Monitoring",
+        "command": "df -h",
+        "run_as": "current_user",
+        "requires_root": False,
+        "timeout": 10,
+        "tags": '["monitoring", "disk"]',
+    },
+    {
+        "name": "Check Memory & Swap",
+        "description": "Display memory and swap usage summary using free -h.",
+        "category": "Monitoring",
+        "command": "free -h",
+        "run_as": "current_user",
+        "requires_root": False,
+        "timeout": 10,
+        "tags": '["monitoring", "memory"]',
+    },
+    {
+        "name": "Restart Nginx",
+        "description": "Restart the Nginx service — useful after config changes or to clear stuck workers.",
+        "category": "System",
+        "command": "systemctl restart nginx",
+        "run_as": "sudo",
+        "requires_root": True,
+        "timeout": 30,
+        "tags": '["nginx", "service"]',
+    },
+    {
+        "name": "Journalctl Last Hour",
+        "description": "View system log entries from the last 60 minutes.",
+        "category": "Monitoring",
+        "command": "journalctl --since '1 hour ago' --no-pager",
+        "run_as": "sudo",
+        "requires_root": True,
+        "timeout": 30,
+        "tags": '["logs", "journal"]',
+    },
+    {
+        "name": "Docker Container Logs",
+        "description": "Fetch recent logs from all running containers (last 50 lines each).",
+        "category": "Docker",
+        "command": "docker ps -q | xargs -I {} sh -c 'echo \"=== {} ===\" && docker logs --tail 50 {}'",
+        "run_as": "sudo",
+        "requires_root": True,
+        "timeout": 60,
+        "tags": '["docker", "logs"]',
+    },
+    {
+        "name": "Uptime & Load",
+        "description": "Show system uptime, logged-in users, and load averages.",
+        "category": "Monitoring",
+        "command": "uptime && echo '---' && who && echo '---' && cat /proc/loadavg",
+        "run_as": "current_user",
+        "requires_root": False,
+        "timeout": 10,
+        "tags": '["monitoring", "uptime"]',
+    },
+    {
+        "name": "Kill Stale Docker Containers",
+        "description": "Stop and remove all containers that exited with a non-zero code (stale/dead containers).",
+        "category": "Docker",
+        "command": "docker ps -a --filter 'exited=1' -q | xargs -r docker rm -f",
+        "run_as": "sudo",
+        "requires_root": True,
+        "timeout": 60,
+        "tags": '["docker", "cleanup"]',
+    },
+    {
+        "name": "Network Connections Summary",
+        "description": "List all listening TCP/UDP ports and associated processes.",
+        "category": "Security",
+        "command": "ss -tulpn",
+        "run_as": "sudo",
+        "requires_root": True,
+        "timeout": 10,
+        "tags": '["network", "security"]',
+    },
+]
+
+
+@app.post("/api/scripts/seed-templates")
+async def seed_script_templates(request: Request):
+    user = require_auth(request)
+    db = SessionLocal()
+    try:
+        existing = db.query(ScriptModel).first()
+        if existing:
+            return {"message": "Scripts already exist, templates not seeded.", "count": 0}
+
+        created = []
+        for tpl in BUILTIN_TEMPLATES:
+            script = ScriptModel(
+                id=str(uuid.uuid4())[:8],
+                name=tpl["name"],
+                description=tpl["description"],
+                category=tpl["category"],
+                command=tpl["command"],
+                run_as=tpl["run_as"],
+                requires_root=tpl["requires_root"],
+                timeout=tpl["timeout"],
+                pinned=True,
+                tags=tpl["tags"],
+                created_by=user["id"],
+                created_at=time.time(),
+                updated_at=time.time(),
+            )
+            db.add(script)
+            db.flush()
+            created.append(_script_to_dict(script))
+
+        db.commit()
+        audit_log(request, "script_seed_templates", resource_type="script", details={"count": len(created)})
+        return {"message": f"Seeded {len(created)} template scripts.", "scripts": created, "count": len(created)}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        db.close()
 
 
 # ═══════════════════════════════════════════════════════════════
