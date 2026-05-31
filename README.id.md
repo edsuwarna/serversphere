@@ -18,13 +18,26 @@ Tools lain terlalu kompleks. Jadinya bikin sendiri — ServerSphere, open source
 ## Jalanin
 
 ```bash
-git clone https://github.com/edsuwarna/serversphere.git
-cd serversphere
 docker compose up -d
 # Buka http://your-server-ip:8080
 ```
 
-Atau pake image dari GHCR — langsung `docker compose up -d` pake [docker-compose.yml ini](https://github.com/edsuwarna/serversphere).
+## Image Docker
+
+Tersedia di [GitHub Container Registry](https://github.com/users/edsuwarna/packages/container/package/serversphere).
+
+```yaml
+image: ghcr.io/edsuwarna/serversphere:TAG
+```
+
+| Tag | Nunjuk ke | Dipasang oleh | Kapan pakenya |
+|-----|-----------|---------------|--------------|
+| `latest` | Rilis stabil terbaru | Release workflow | Production — versi stabil paling baru |
+| `0.1.0` | Rilis ini | Release workflow | Pin ke versi tertentu |
+| `edge` | Commit terakhir di `main` | Main-build workflow | Testing / staging — fitur terbaru |
+| `sha-xxxxxxx` | Commit spesifik | Main-build workflow | Rollback / debugging |
+
+> **💡 Tips:** Pake `ghcr.io/edsuwarna/serversphere:latest` di production. Selalu nunjuk ke rilis stabil tanpa ke-*overwrite* sama build dari main.
 
 ## Tech
 
