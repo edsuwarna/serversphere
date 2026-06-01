@@ -298,6 +298,21 @@ function showPage(page) {
     if (page === 'settings') checkTotpStatus();
 }
 
+// ─── Collapsible Cards ──────────────────────────────────────
+function toggleCollapsible(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const iconId = id.replace('Body', 'Icon');
+    const icon = document.getElementById(iconId);
+    if (el.style.display === 'none') {
+        el.style.display = 'block';
+        if (icon) icon.style.transform = 'rotate(0deg)';
+    } else {
+        el.style.display = 'none';
+        if (icon) icon.style.transform = 'rotate(-90deg)';
+    }
+}
+
 // ─── Dashboard ──────────────────────────────────────────────
 async function refreshDashboard() {
     try {
@@ -4647,8 +4662,8 @@ function showTotpSetupModal(data) {
     const secretEl = document.getElementById('totpSecret');
     const codeInput = document.getElementById('totpVerifyCode');
 
-    if (qrEl && data.qr_code) {
-        qrEl.innerHTML = `<img src="${esc(data.qr_code)}" alt="TOTP QR Code" style="max-width:200px;border-radius:8px;">`;
+    if (qrEl && data.qr_base64) {
+        qrEl.innerHTML = `<img src="data:image/png;base64,${esc(data.qr_base64)}" alt="TOTP QR Code" style="max-width:200px;border-radius:8px;">`;
     } else if (qrEl) {
         qrEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted)">QR code unavailable</div>';
     }
