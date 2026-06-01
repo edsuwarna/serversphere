@@ -422,11 +422,21 @@ ps aux --sort=-%mem | head -8
 
     def get_compose_files(self, vps: VPSConfig) -> list:
         """Find docker-compose files on the VPS."""
-        cmd = """find / -maxdepth 4 -name 'docker-compose*' -o -name 'compose.yaml' 2>/dev/null | grep -v '/proc/\\|/sys/\\|/snap/\\|/var/lib/docker/' | sort -u"""
+        # First check docker compose is available
+        check_cmd = "docker compose version 2>/dev/null || docker-compose --version 2>/dev/null || echo 'NO_DOCKER_COMPOSE'"
+        check_r = self.ssh_pool.execute(vps, check_cmd, timeout=5)
+        if not check_r["success"] or 'NO_DOCKER_COMPOSE' in check_r.get("stdout", ""):
+            return []
+
+        # Search for compose files - only match actual compose config files
+        cmd = """find / -maxdepth 5 \\( -name 'docker-compose.yaml' -o -name 'docker-compose.yml' -o -name 'compose.yaml' -o -name 'compose.yml' \\) 2>/dev/null | grep -vE '/proc/|/sys/|/snap/|/var/lib/docker/|/var/lib/containerd/|/run/|/cli-plugins/|/doc/|/docs/|/info/|/usr/lib/|/usr/share/' | sort -u"""
         r = self.ssh_pool.execute(vps, cmd, timeout=15)
         if not r["success"]:
             return []
-        files = [f.strip() for f in r["stdout"].strip().split("\n") if f.strip()]
+        stdout = r.get("stdout", "").strip()
+        if not stdout:
+            return []
+        files = [f.strip() for f in stdout.split("\n") if f.strip()]
         # Enrich with directory info
         result = []
         seen_dirs = set()
@@ -541,15 +551,29 @@ ps aux --sort=-%mem | head -8
 
     def network_traceroute(self, vps: VPSConfig, target: str) -> dict:
         """Traceroute to a target from the VPS."""
-        cmd = f"traceroute -n -w 3 {target} 2>&1 || traceroute {target} 2>&1"
+        # Try multiple tools with fallbacks
+        cmd = (
+            f"traceroute -n -w 3 {target} 2>&1 || "  # standard traceroute
+            f"tracepath -n {target} 2>&1 || "  # lighter fallback
+            f"mtr --report -n -c 1 {target} 2>&1 || "  # mtr fallback
+            f"echo 'TRACEROUTE_NOT_AVAILABLE: Install traceroute (apt install traceroute || yum install traceroute)'"
+        )
         r = self.ssh_pool.execute(vps, cmd, timeout=60)
         hops = []
-        for line in r["stdout"].split("\n"):
+        stdout = r.get("stdout", "")
+        for line in stdout.split("\n"):
             line = line.strip()
-            if not line or "traceroute to" in line:
+            if not line or "traceroute to" in line or "TRACEROUTE_NOT_AVAILABLE" in line:
                 continue
             hops.append(line)
-        return {"success": r["success"], "hops": hops, "output": r["stdout"], "error": r["stderr"]}
+        is_available = "TRACEROUTE_NOT_AVAILABLE" not in stdout
+        return {
+            "success": r["success"] and is_available,
+            "hops": hops,
+            "output": stdout,
+            "available": is_available,
+            "error": r.get("stderr", ""),
+        }
 
     def network_dns_lookup(self, vps: VPSConfig, domain: str, record_type: str = "A") -> dict:
         """DNS lookup from the VPS."""

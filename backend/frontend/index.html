@@ -72,7 +72,7 @@
                     <circle cx="18.5" cy="22" r="1.5" fill="var(--emerald-400)"/>
                 </svg>
                 <span class="brand-text">ServerSphere</span>
-                <span class="brand-version">v0.1.0</span>
+                <span class="brand-version" id="brandVersion">v0.1.0</span>
             </div>
 
             <nav class="sidebar-nav">
@@ -147,7 +147,7 @@
                     <span class="nav-label">Add Instance</span>
                 </a>
                 <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-light)">
-                    <div class="version">ServerSphere v0.1.0</div>
+                    <div class="version" id="pageVersion">ServerSphere v0.1.0</div>
                 </div>
             </div>
         </aside>
@@ -242,24 +242,9 @@
                             <span class="material-icons" style="font-size:18px">add</span> Add Instance
                         </button>
                     </div>
-                    <div class="table-wrapper">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th style="width:36px;"><input type="checkbox" id="selectAllVPS" onchange="toggleSelectAllVPS(this)" title="Select all"></th>
-                                <th>Status</th>
-                                <th>Name</th>
-                                <th>Host</th>
-                                <th>User</th>
-                                <th>Group</th>
-                                <th>Tags</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="vpsTableBody">
-                        </tbody>
-                    </table>
-                </div>
+                    <div class="vps-card-grid" id="vpsCardGrid">
+                        <!-- VPS cards rendered dynamically by JS -->
+                    </div>
 
                 <!-- ═══ Bulk Action Bar ═══ -->
                 <div id="bulkActionBar" class="bulk-action-bar hidden">
@@ -268,6 +253,9 @@
                         <div class="bulk-actions">
                             <button class="btn btn-primary btn-sm" onclick="showBulkCommandModal()">
                                 <span class="material-icons" style="font-size:16px">terminal</span> Run Command
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="bulkDeleteVPS()" id="bulkDeleteBtn">
+                                <span class="material-icons" style="font-size:16px">delete</span> Delete
                             </button>
                             <div class="bulk-quick-actions">
                                 <button class="btn btn-sm" onclick="bulkQuickAction('ping -c 3 google.com')" title="Ping test">
@@ -317,6 +305,7 @@
                                     <th>Groups</th>
                                     <th>VPS Access</th>
                                     <th>Status</th>
+                                    <th>2FA</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -348,6 +337,9 @@
                             <option value="user_create">User Create</option>
                             <option value="user_update">User Update</option>
                             <option value="user_delete">User Delete</option>
+                            <option value="user_vps_access_update">User VPS Access</option>
+                            <option value="user_group_update">User Group Access</option>
+                            <option value="invite_generated">Invite Generated</option>
                             <option value="exec_command">Exec Command</option>
                             <option value="terminal_connect">Terminal Connect</option>
                             <option value="bulk_command">Bulk Command</option>
@@ -356,10 +348,33 @@
                             <option value="group_create">Group Create</option>
                             <option value="group_update">Group Update</option>
                             <option value="group_delete">Group Delete</option>
+                            <option value="compose_up">Compose Up</option>
+                            <option value="compose_down">Compose Down</option>
+                            <option value="compose_restart">Compose Restart</option>
+                            <option value="crontab_update">Crontab Update</option>
+                            <option value="cronjob_create">Cron Job Create</option>
+                            <option value="script_create">Script Create</option>
+                            <option value="script_run">Script Run</option>
+                            <option value="script_update">Script Update</option>
+                            <option value="script_delete">Script Delete</option>
+                            <option value="github_token_create">GitHub Token</option>
+                            <option value="github_repo_add">GitHub Repo</option>
+                            <option value="totp_setup_started">TOTP Setup</option>
+                            <option value="totp_disabled">TOTP Disable</option>
+                            <option value="oidc_error">OIDC Error</option>
                         </select>
                         <input type="text" id="auditUserFilter" placeholder="Filter by user..." oninput="debounceAuditFilter()"
                             style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text);font-size:13px;width:200px;">
                         <span id="auditTotalCount" style="font-size:12px;color:var(--text-muted);"></span>
+                    </div>
+                    <div class="audit-pagination" style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+                        <button class="btn btn-xs" id="auditPrevBtn" onclick="prevAuditPage()" style="display:none">
+                            <span class="material-icons" style="font-size:14px">chevron_left</span> Previous
+                        </button>
+                        <span id="auditPageInfo" style="font-size:12px;color:var(--text-muted);"></span>
+                        <button class="btn btn-xs" id="auditNextBtn" onclick="nextAuditPage()">
+                            Next <span class="material-icons" style="font-size:14px">chevron_right</span>
+                        </button>
                     </div>
                     <div class="table-wrapper">
                         <table class="data-table">
@@ -841,11 +856,17 @@
                         </select>
                         <select id="scriptSortFilter" onchange="filterScripts()"
                             style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text);font-size:13px;min-width:140px;">
+                            <option value="name">Name (A-Z)</option>
                             <option value="newest">Newest First</option>
                             <option value="oldest">Oldest First</option>
-                            <option value="name">Name</option>
                             <option value="runs">Most Runs</option>
                         </select>
+                    </div>
+
+                    <!-- Favorites Tab -->
+                    <div style="display:flex;gap:12px;margin-bottom:12px;">
+                        <button class="tab active" data-tab="all" onclick="setScriptTab('all')">📋 All</button>
+                        <button class="tab" data-tab="favorites" onclick="setScriptTab('favorites')">⭐ Favorites</button>
                     </div>
 
                     <!-- Card Grid -->
@@ -866,11 +887,12 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
+                                    <th>Status</th>
                                     <th>Script</th>
                                     <th>VPS</th>
-                                    <th>Status</th>
-                                    <th>Started</th>
                                     <th>Duration</th>
+                                    <th>Started</th>
+                                    <th>Triggered By</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -905,52 +927,8 @@
                             <p style="color:var(--text-muted);">Select a VPS to view Docker Compose files.</p>
                         </div>
                         <h4 id="composeFilesHeading" style="margin:0 0 12px;font-size:14px;font-weight:600;display:none;">Compose Files</h4>
-                        <div id="composeFilesContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">
-                            <!-- Compose file cards rendered dynamically by JS -->
-                        </div>
-                        <!-- Template for compose file cards -->
-                        <div id="composeCardTemplate" style="display:none;">
-                            <div class="card compose-file-card" data-project="">
-                                <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
-                                    <div style="display:flex;align-items:center;gap:8px;">
-                                        <span class="material-icons" style="font-size:18px;color:var(--primary)">layers</span>
-                                        <h4 class="compose-project-name" style="margin:0;font-size:14px;font-weight:600;"></h4>
-                                    </div>
-                                    <span class="compose-status-indicator" style="display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:2px 8px;border-radius:10px;"></span>
-                                </div>
-                                <div class="card-body" style="padding:8px 16px 12px;">
-                                    <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">
-                                        <span class="material-icons" style="font-size:14px;vertical-align:middle;margin-right:4px;">folder</span>
-                                        <span class="compose-file-path"></span>
-                                    </div>
-                                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                                        <button class="btn btn-sm btn-primary" onclick="composeAction(this, 'up')">
-                                            <span class="material-icons" style="font-size:14px">play_arrow</span> Up
-                                        </button>
-                                        <button class="btn btn-sm" onclick="composeAction(this, 'down')" style="background:var(--danger);color:#fff;">
-                                            <span class="material-icons" style="font-size:14px">stop</span> Down
-                                        </button>
-                                        <button class="btn btn-sm" onclick="composeAction(this, 'restart')">
-                                            <span class="material-icons" style="font-size:14px">replay</span> Restart
-                                        </button>
-                                        <button class="btn btn-sm btn-ghost" onclick="composeAction(this, 'pull')">
-                                            <span class="material-icons" style="font-size:14px">download</span> Pull
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Compose Services Table -->
-                    <div id="composeServicesContainer" class="card" style="padding:0;overflow:hidden;">
-                        <div class="card-header" style="padding:12px 16px;">
-                            <span class="material-icons" style="font-size:18px;margin-right:8px">view_in_ar</span>
-                            <h3 style="margin:0;font-size:14px;font-weight:600;">Services</h3>
-                        </div>
-                        <div class="empty-state" id="composeServicesEmpty">
-                            <span class="material-icons empty-icon" style="font-size:48px;color:var(--text-muted)">view_in_ar</span>
-                            <p style="color:var(--text-muted);">Select a VPS and compose file to view services.</p>
+                        <div id="composeFilesContainer" style="display:flex;flex-direction:column;gap:0;">
+                            <!-- Compose file cards and their services panels rendered dynamically by JS -->
                         </div>
                     </div>
                 </div>
@@ -1204,6 +1182,18 @@
                                     <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Display Name</label>
                                     <span id="settingsDisplayName" style="font-size:14px;font-weight:500;">-</span>
                                 </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">VPS Access</label>
+                                    <span id="settingsVpsCount" style="font-size:14px;font-weight:500;">-</span>
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Groups</label>
+                                    <span id="settingsGroups" style="font-size:14px;font-weight:500;">-</span>
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Created At</label>
+                                    <span id="settingsCreatedAt" style="font-size:14px;font-weight:500;">-</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1344,7 +1334,6 @@
 
             <!-- Wizard Footer -->
             <div class="modal-footer" style="padding:16px 24px;">
-                <button type="button" class="btn btn-secondary" id="wizardCancelBtn" onclick="closeVPSModal()">Cancel</button>
                 <button type="button" class="btn btn-secondary" id="wizardPrevBtn" onclick="prevAddStep()" style="display:none;">
                     <span class="material-icons" style="font-size:16px">arrow_back</span> Back
                 </button>
@@ -1354,6 +1343,7 @@
                 <button type="button" class="btn btn-primary hidden" id="wizardSaveBtn" onclick="saveVPSFromWizard()">
                     <span class="material-icons" style="font-size:16px">add_circle</span> Add Instance
                 </button>
+                <button type="button" class="btn btn-secondary" id="wizardCancelBtn" onclick="closeVPSModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1432,8 +1422,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save User</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancel</button>
                 </div>
             </form>
         </div>
@@ -1456,8 +1446,8 @@
             <div id="vpsAccessCheckboxes" style="max-height:300px;overflow-y:auto;padding: 0 24px;"></div>
             <p id="vpsAccessGroupNote" style="font-size:11px;color:var(--text-muted);padding:0 24px;margin-top:8px;"></p>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeVPSAccessModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveVPSAccess()">Save Access</button>
+                <button type="button" class="btn btn-secondary" onclick="closeVPSAccessModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1508,10 +1498,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeInviteModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" id="generateInviteBtn" onclick="generateInvite()">
                     <span class="material-icons" style="font-size:16px">link</span> Generate Invite Link
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeInviteModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1569,10 +1559,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeSSHKeyModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveSSHKey()">
                     <span class="material-icons" style="font-size:16px">vpn_key</span> Save Key
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeSSHKeyModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1603,10 +1593,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeGroupModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveGroup()">
                     <span class="material-icons" style="font-size:16px">create_new_folder</span> Save Group
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeGroupModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1648,10 +1638,10 @@
             </p>
             <div id="addVPSToGroupCheckboxes" style="max-height:350px;overflow-y:auto;padding:0 24px;"></div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeAddVPSToGroupModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveVPSToGroup()">
                     <span class="material-icons" style="font-size:16px">save</span> Save
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeAddVPSToGroupModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1672,10 +1662,10 @@
             </p>
             <div id="removeVPSFromGroupCheckboxes" style="max-height:350px;overflow-y:auto;padding:0 24px;"></div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeRemoveVPSFromGroupModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" style="background:var(--warning)" onclick="saveRemoveVPSFromGroup()">
                     <span class="material-icons" style="font-size:16px">remove_circle</span> Remove
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeRemoveVPSFromGroupModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1696,8 +1686,8 @@
             </p>
             <div id="groupAccessCheckboxes" style="max-height:300px;overflow-y:auto;padding: 0 24px;"></div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeGroupAccessModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveGroupAccess()">Save Access</button>
+                <button type="button" class="btn btn-secondary" onclick="closeGroupAccessModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1733,10 +1723,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeAddTokenModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveToken()">
                     <span class="material-icons" style="font-size:16px;">token</span> Save Token
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeAddTokenModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1798,10 +1788,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeAddRepoModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveRepo()">
                     <span class="material-icons" style="font-size:16px;">source</span> Track Repo
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeAddRepoModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1829,10 +1819,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeEditRepoModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveEditRepo()">
                     <span class="material-icons" style="font-size:16px;">save</span> Save
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeEditRepoModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1867,10 +1857,10 @@
                 <div id="bulkVpsList" style="margin-top:12px;padding:8px 10px;background:var(--bg-elevated);border-radius:6px;font-size:12px;color:var(--text-secondary);max-height:100px;overflow-y:auto;font-family:var(--mono);"></div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeBulkCmdModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" id="bulkCmdRunBtn" onclick="executeBulkCommand()">
                     <span class="material-icons" style="font-size:16px">play_arrow</span> Run
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeBulkCmdModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -2034,7 +2024,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary" onclick="executeScriptRun()">
+                <button type="button" id="scriptRunExecuteBtn" class="btn btn-primary" onclick="executeScriptRun()">
                     <span class="material-icons" style="font-size:16px;">play_arrow</span> Run Script
                 </button>
                 <button type="button" class="btn btn-secondary" onclick="closeScriptRunModal()">Cancel</button>
@@ -2118,6 +2108,24 @@
 
     <!-- Hidden file input for script import -->
     <input type="file" id="scriptImportInput" accept=".json" style="display:none" onchange="onScriptImportFile(event)">
+
+    <!-- ═══ Script Run Results Modal ═══ -->
+    <div id="scriptRunResultsModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeScriptRunResultsModal()"></div>
+        <div class="modal-card modal-lg" style="max-width:800px;">
+            <div class="modal-header">
+                <h3>Script Execution Results</h3>
+                <button class="modal-close" onclick="closeScriptRunResultsModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div class="modal-body" style="max-height:70vh;overflow-y:auto;padding:16px 24px;">
+                <div id="scriptRunResultsSummary" style="font-size:14px;display:flex;align-items:center;flex-wrap:wrap;gap:4px;"></div>
+                <hr style="border:none;border-top:1px solid var(--border);margin:8px 0;">
+                <div id="scriptRunResultsBody"></div>
+            </div>
+        </div>
+    </div>
 
     <!-- ═══ TOTP Setup Modal ═══ -->
     <div id="totpSetupModal" class="modal hidden">
@@ -2206,10 +2214,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeCronEditModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveCronJob()">
                     <span class="material-icons" style="font-size:16px">save</span> Save
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeCronEditModal()">Cancel</button>
             </div>
         </div>
     </div>

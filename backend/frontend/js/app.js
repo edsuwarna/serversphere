@@ -18,6 +18,7 @@ let currentUser = null;    // { id, username, role, display_name, vps_access }
 let currentComposeVpsId = '';
 let currentCronVpsId = '';
 let currentNetworkVpsId = '';
+let scriptActiveTab = 'all';
 
 // ─── Role helpers ───────────────────────────────────────────
 function isAdmin()    { return currentUser && currentUser.role === 'admin'; }
@@ -172,8 +173,16 @@ function showApp() {
 
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const user = document.getElementById('loginUser').value;
+    const user = document.getElementById('loginUser').value.trim();
     const pass = document.getElementById('loginPass').value;
+    const errEl = document.getElementById('loginError');
+
+    // Client-side validation
+    if (!user || !pass) {
+        errEl.textContent = 'Username and password are required';
+        errEl.classList.remove('hidden');
+        return;
+    }
     try {
         const r = await api('POST', '/auth/login', { username: user, password: pass });
         // New format: { success, user: { id, username, role, display_name }, totp_required }
@@ -224,6 +233,12 @@ function oidcLogin() {
 }
 
 async function logout() {
+    // Disconnect all terminal sessions
+    if (activeTerminalSession && terminalSessions[activeTerminalSession]) {
+        disconnectTerminal();
+    }
+    // Fallback: close legacy terminal WS
+    if (terminalWs) { terminalWs.close(); terminalWs = null; }
     try { await api('POST', '/auth/logout'); } catch {}
     currentUser = null;
     showLogin();
@@ -295,7 +310,7 @@ function showPage(page) {
     if (page === 'compose') loadVpsComposeList();
     if (page === 'cron') loadVpsCronList();
     if (page === 'network') loadVpsNetworkList();
-    if (page === 'settings') checkTotpStatus();
+    if (page === 'settings') loadSettings();
 }
 
 // ─── Collapsible Cards ──────────────────────────────────────
@@ -340,18 +355,16 @@ async function refreshDashboard() {
         document.getElementById('onlineVPS').textContent = online;
         document.getElementById('offlineVPS').textContent = offline;
 
-        // Fetch container counts for online VPS (in background)
+        // Fetch container counts in batch for all online VPS
         let totalContainers = 0;
-        const containerPromises = vpsList.filter(v => v.online).map(async v => {
+        const onlineIds = vpsList.filter(v => v.online).map(v => v.id);
+        if (onlineIds.length > 0) {
             try {
-                const containers = await api('GET', `/vps/${v.id}/containers`);
-                if (Array.isArray(containers)) totalContainers += containers.length;
+                const containerCounts = await api('POST', '/vps/containers/count', { ids: onlineIds });
+                totalContainers = Object.values(containerCounts).reduce((a, b) => a + (b || 0), 0);
             } catch {}
-        });
-        document.getElementById('totalContainers').textContent = '...';
-        Promise.all(containerPromises).then(() => {
-            document.getElementById('totalContainers').textContent = totalContainers;
-        });
+        }
+        document.getElementById('totalContainers').textContent = totalContainers;
 
         // Render cards
         const grid = document.getElementById('dashboardGrid');
@@ -411,23 +424,38 @@ async function loadCardResources(vpsId) {
         if (!resEl || r.error) return;
 
         let resHtml = '';
-        if (r.cpu_percent !== undefined) {
-            const color = r.cpu_percent > 80 ? 'var(--danger)' : r.cpu_percent > 60 ? 'var(--warning)' : 'var(--success)';
-            resHtml += `<div class="resource-item">CPU: <span>${r.cpu_percent}%</span>
-                <div class="resource-bar"><div class="resource-bar-fill" style="width:${r.cpu_percent}%;background:${color}"></div></div></div>`;
+        if (r.cpu_percent !== undefined && r.cpu_percent !== 'N/A') {
+            const pct = parseFloat(r.cpu_percent);
+            const color = pct > 80 ? 'var(--danger)' : pct > 60 ? 'var(--warning)' : 'var(--success)';
+            resHtml += `<div class="resource-item">
+                <span class="resource-item-label">CPU</span>
+                <span style="font-weight:600;color:${color}">${pct}%</span>
+                <div class="resource-bar"><div class="resource-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+            </div>`;
         }
         if (r.memory && r.memory.percent) {
-            const color = r.memory.percent > 80 ? 'var(--danger)' : r.memory.percent > 60 ? 'var(--warning)' : 'var(--success)';
-            resHtml += `<div class="resource-item">RAM: <span>${r.memory.percent}%</span>
-                <div class="resource-bar"><div class="resource-bar-fill" style="width:${r.memory.percent}%;background:${color}"></div></div></div>`;
+            const pct = parseFloat(r.memory.percent);
+            const color = pct > 80 ? 'var(--danger)' : pct > 60 ? 'var(--warning)' : 'var(--success)';
+            const used = formatBytes(r.memory.used_mb * 1024 * 1024);
+            const total = formatBytes(r.memory.total_mb * 1024 * 1024);
+            resHtml += `<div class="resource-item">
+                <span class="resource-item-label">RAM</span>
+                <span style="font-weight:600;color:${color}">${pct}%</span>
+                <span style="font-size:11px;color:var(--text-muted)">${used} / ${total}</span>
+                <div class="resource-bar"><div class="resource-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+            </div>`;
         }
         if (r.disk && r.disk.percent) {
             const pct = parseInt(r.disk.percent);
             const color = pct > 80 ? 'var(--danger)' : pct > 60 ? 'var(--warning)' : 'var(--success)';
-            resHtml += `<div class="resource-item">Disk: <span>${r.disk.percent}%</span>
-                <div class="resource-bar"><div class="resource-bar-fill" style="width:${r.disk.percent}%;background:${color}"></div></div></div>`;
+            resHtml += `<div class="resource-item">
+                <span class="resource-item-label">Disk</span>
+                <span style="font-weight:600;color:${color}">${pct}%</span>
+                <span style="font-size:11px;color:var(--text-muted)">${r.disk.used || '?'} / ${r.disk.total || '?'}</span>
+                <div class="resource-bar"><div class="resource-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+            </div>`;
         }
-        resEl.innerHTML = resHtml || '<div style="font-size:11px;color:var(--text-muted)">No resource data</div>';
+        resEl.innerHTML = resHtml || '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:4px">No resource data</div>';
     } catch {}
 }
 
@@ -450,25 +478,58 @@ async function loadVPSList() {
             v.online = statusMap[v.id] === true;
         }
 
-        const tbody = document.getElementById('vpsTableBody');
+        const container = document.getElementById('vpsCardGrid');
         if (vpsList.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">No VPS available.</td></tr>';
+            container.innerHTML = '<div class="empty-state"><span class="material-icons empty-icon" style="font-size:48px">dns</span><p>No VPS available.</p></div>';
             return;
         }
-        tbody.innerHTML = vpsList.map(v => `<tr>
-            <td><input type="checkbox" class="vps-checkbox" value="${v.id}" ${selectedVPSIds.has(v.id) ? 'checked' : ''} onchange="updateBulkActionBar()"></td>
-            <td><span class="status-dot ${v.online ? 'online' : 'offline'}"></span></td>
-            <td><strong>${esc(v.name)}</strong></td>
-            <td><code>${esc(v.host)}:${v.port}</code></td>
-            <td>${esc(v.username)}</td>
-            <td><span class="tag">${esc(v.group)}</span></td>
-            <td>${v.tags && v.tags.length ? v.tags.map(t => `<span class="tag">${esc(t)}</span>`).join(' ') : '-'}</td>
-            <td class="action-btns">
-                <button class="btn btn-xs btn-primary" onclick="showVPSDetail('${v.id}')">Open</button>
-                ${isAdmin() ? `<button class="btn btn-xs" onclick="editVPS('${v.id}')">Edit</button>
-                <button class="btn btn-xs btn-danger" onclick="deleteVPS('${v.id}','${esc(v.name)}')">Delete</button>` : ''}
-            </td>
-        </tr>`).join('');
+        container.innerHTML = vpsList.map(v => `
+            <div class="vps-card ${v.online ? 'online' : 'offline'}">
+                <div class="vps-card-header">
+                    <div class="vps-card-status">
+                        <span class="status-dot ${v.online ? 'online' : 'offline'}"></span>
+                        <span class="vps-card-name">${esc(v.name)}</span>
+                        <span class="status-label ${v.online ? 'online' : 'offline'}">${v.online ? '🟢 Online' : '🔴 Offline'}</span>
+                    </div>
+                    <div class="vps-card-check">
+                        <input type="checkbox" class="vps-checkbox" value="${v.id}" ${selectedVPSIds.has(v.id) ? 'checked' : ''} onchange="updateBulkActionBar()">
+                    </div>
+                </div>
+                <div class="vps-card-body">
+                    <div class="vps-card-info">
+                        <div class="vps-card-row">
+                            <span class="material-icons card-row-icon">computer</span>
+                            <code>${esc(v.host)}:${v.port}</code>
+                        </div>
+                        <div class="vps-card-row">
+                            <span class="material-icons card-row-icon">person</span>
+                            <span>${esc(v.username)}</span>
+                        </div>
+                        ${v.group ? `<div class="vps-card-row">
+                            <span class="material-icons card-row-icon">folder</span>
+                            <span class="tag">${esc(v.group)}</span>
+                        </div>` : ''}
+                        ${v.tags && v.tags.length ? `<div class="vps-card-row vps-card-tags">
+                            <span class="material-icons card-row-icon">label</span>
+                            ${v.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}
+                        </div>` : ''}
+                    </div>
+                </div>
+                <div class="vps-card-actions">
+                    <button class="btn btn-sm btn-primary" onclick="showVPSDetail('${v.id}')">
+                        <span class="material-icons" style="font-size:16px">open_in_new</span> Open
+                    </button>
+                    ${isAdmin() ? `
+                        <button class="btn btn-sm" onclick="editVPS('${v.id}')">
+                            <span class="material-icons" style="font-size:16px">edit</span> Edit
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteVPS('${v.id}','${esc(v.name)}')">
+                            <span class="material-icons" style="font-size:16px">delete</span> Delete
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `).join('');
     } catch (err) {
         console.error('VPS list error:', err);
     }
@@ -502,6 +563,10 @@ function updateBulkActionBar() {
     const count = document.getElementById('selectedCount');
     const n = selectedVPSIds.size;
 
+    // Show/hide bulk delete button based on admin role
+    const delBtn = document.getElementById('bulkDeleteBtn');
+    if (delBtn) delBtn.style.display = isAdmin() ? 'inline-flex' : 'none';
+
     if (n > 0) {
         bar.classList.remove('hidden');
         count.textContent = `${n} selected`;
@@ -516,6 +581,25 @@ function clearSelection() {
     const selectAll = document.getElementById('selectAllVPS');
     if (selectAll) selectAll.checked = false;
     updateBulkActionBar();
+}
+
+function bulkDeleteVPS() {
+    const n = selectedVPSIds.size;
+    if (n === 0) { showToast('No VPS selected', 'warning'); return; }
+    if (!isAdmin()) { showToast('Permission denied', 'error'); return; }
+
+    showConfirm(`Delete ${n} VPS instance(s)? This cannot be undone.`, async () => {
+        const ids = Array.from(selectedVPSIds);
+        try {
+            const r = await api('POST', '/vps/bulk/delete', { vps_ids: ids });
+            showToast(`Deleted ${r.deleted} VPS`, 'success');
+            clearSelection();
+            loadVPSList();
+            refreshDashboard();
+        } catch (err) {
+            showToast('Bulk delete failed: ' + err.message, 'error');
+        }
+    });
 }
 
 function showBulkCommandModal() {
@@ -735,7 +819,9 @@ function nextAddStep() {
     // Validate current step
     if (addVPSStep === 1) {
         const host = document.getElementById('vpsHost').value.trim();
+        const port = parseInt(document.getElementById('vpsPort').value) || 22;
         if (!host) { showToast('Host / IP is required', 'warning'); return; }
+        if (port < 1 || port > 65535) { showToast('Port must be between 1 and 65535', 'warning'); return; }
         collectWizardData();
     }
     if (addVPSStep === 2) {
@@ -939,6 +1025,7 @@ async function editVPS(vpsId) {
 async function saveVPSFromWizard() {
     const editId = document.getElementById('vpsEditId').value;
     collectWizardData();
+    setLoading('wizardSaveBtn', true, 'Saving...');
     const data = {
         name: addVPSData.name,
         host: addVPSData.host,
@@ -955,10 +1042,12 @@ async function saveVPSFromWizard() {
         } else {
             await api('POST', '/vps', data);
         }
+        setLoading('wizardSaveBtn', false, 'Save');
         closeVPSModal();
         loadVPSList();
         refreshDashboard();
     } catch (err) {
+        setLoading('wizardSaveBtn', false, 'Save');
         showToast('Error: ' + err.message, 'error');
     }
 }
@@ -1006,14 +1095,59 @@ async function refreshVPSDetail() {
 async function loadVPSInfo(vpsId) {
     try {
         const info = await api('GET', `/vps/${vpsId}/info`);
-        document.getElementById('vpsInfoBody').innerHTML = `<div class="info-grid">
-            <div class="info-item"><div class="info-label">Hostname</div><div class="info-value">${esc(info.hostname)}</div></div>
-            <div class="info-item"><div class="info-label">Kernel</div><div class="info-value">${esc(info.kernel)}</div></div>
-            <div class="info-item"><div class="info-label">OS</div><div class="info-value" style="font-size:12px">${esc(info.os)}</div></div>
-            <div class="info-item"><div class="info-label">Uptime</div><div class="info-value">${esc(info.uptime)}</div></div>
-            <div class="info-item"><div class="info-label">CPU</div><div class="info-value">${esc(info.cpu_model)}</div></div>
-            <div class="info-item"><div class="info-label">CPU Cores</div><div class="info-value">${esc(info.cpu_cores)}</div></div>
-        </div>`;
+        document.getElementById('vpsInfoBody').innerHTML = `
+            <div class="sysinfo-section">
+                <div class="sysinfo-title"><span class="material-icons">dns</span> System</div>
+                <div class="sysinfo-grid">
+                    <div class="sysinfo-item">
+                        <span class="sysinfo-icon">🖥️</span>
+                        <div class="sysinfo-text">
+                            <span class="sysinfo-label">Hostname</span>
+                            <span class="sysinfo-val">${esc(info.hostname)}</span>
+                        </div>
+                    </div>
+                    <div class="sysinfo-item">
+                        <span class="sysinfo-icon">⏱️</span>
+                        <div class="sysinfo-text">
+                            <span class="sysinfo-label">Uptime</span>
+                            <span class="sysinfo-val">${esc(info.uptime)}</span>
+                        </div>
+                    </div>
+                    <div class="sysinfo-item">
+                        <span class="sysinfo-icon">🤖</span>
+                        <div class="sysinfo-text">
+                            <span class="sysinfo-label">OS</span>
+                            <span class="sysinfo-val sysinfo-os">${esc(info.os)}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="sysinfo-section">
+                <div class="sysinfo-title"><span class="material-icons">memory</span> Hardware</div>
+                <div class="sysinfo-grid">
+                    <div class="sysinfo-item">
+                        <span class="sysinfo-icon">🧠</span>
+                        <div class="sysinfo-text">
+                            <span class="sysinfo-label">CPU</span>
+                            <span class="sysinfo-val">${esc(info.cpu_model)}</span>
+                        </div>
+                    </div>
+                    <div class="sysinfo-item">
+                        <span class="sysinfo-icon">🔢</span>
+                        <div class="sysinfo-text">
+                            <span class="sysinfo-label">Cores</span>
+                            <span class="sysinfo-val">${esc(info.cpu_cores)}</span>
+                        </div>
+                    </div>
+                    <div class="sysinfo-item">
+                        <span class="sysinfo-icon">💻</span>
+                        <div class="sysinfo-text">
+                            <span class="sysinfo-label">Kernel</span>
+                            <span class="sysinfo-val">${esc(info.kernel)}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
     } catch (err) {
         document.getElementById('vpsInfoBody').innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
     }
@@ -1119,12 +1253,15 @@ async function loadContainers(vpsId) {
         }
 
         el.innerHTML = '<div class="container-grid">' + containers.map(c => `
-            <div class="container-card ${c.state}">
+            <div class="container-card ${c.state}" id="container-${esc(c.id)}">
                 <div class="container-header">
                     <div class="container-name">
                         <span class="container-state ${c.state}">${c.state}</span>
                         ${esc(c.name)}
                     </div>
+                    ${canAct ? `<button class="container-delete-btn" onclick="confirmDeleteContainer('${vpsId}','${c.id}','${esc(c.name)}')" title="Remove container">
+                        <span class="material-icons">delete</span>
+                    </button>` : ''}
                 </div>
                 <div class="container-meta">
                     <div>Image: ${esc(c.image)}</div>
@@ -1133,14 +1270,23 @@ async function loadContainers(vpsId) {
                 </div>
                 <div class="container-actions">
                     ${canAct ? (c.state === 'running' ? `
-                        <button class="btn btn-xs" onclick="containerAction('${vpsId}','${c.id}','stop')">⏹ Stop</button>
-                        <button class="btn btn-xs" onclick="containerAction('${vpsId}','${c.id}','restart')">🔄 Restart</button>
+                        <button class="btn btn-sm" onclick="containerAction('${vpsId}','${c.id}','stop',this)">
+                            <span class="material-icons">stop_circle</span> Stop
+                        </button>
+                        <button class="btn btn-sm" onclick="containerAction('${vpsId}','${c.id}','restart',this)">
+                            <span class="material-icons">replay</span> Restart
+                        </button>
                     ` : `
-                        <button class="btn btn-xs btn-primary" onclick="containerAction('${vpsId}','${c.id}','start')">▶ Start</button>
+                        <button class="btn btn-sm btn-primary" onclick="containerAction('${vpsId}','${c.id}','start',this)">
+                            <span class="material-icons">play_arrow</span> Start
+                        </button>
                     `) : ''}
-                    <button class="btn btn-xs" onclick="showContainerLogs('${vpsId}','${c.id}','${esc(c.name)}')">📋 Logs</button>
-                    <button class="btn btn-xs" onclick="showContainerStats('${vpsId}','${c.id}','${esc(c.name)}')">📊 Stats</button>
-                    ${canAct ? `<button class="btn btn-xs btn-danger" onclick="containerAction('${vpsId}','${c.id}','remove')">🗑️</button>` : ''}
+                    <button class="btn btn-sm icon-btn" onclick="showContainerLogs('${vpsId}','${c.id}','${esc(c.name)}')" title="Logs">
+                        <span class="material-icons">article</span>
+                    </button>
+                    <button class="btn btn-sm icon-btn" onclick="showContainerStats('${vpsId}','${c.id}','${esc(c.name)}')" title="Stats">
+                        <span class="material-icons">monitoring</span>
+                    </button>
                 </div>
             </div>
         `).join('') + '</div>';
@@ -1149,18 +1295,78 @@ async function loadContainers(vpsId) {
     }
 }
 
-async function containerAction(vpsId, containerId, action) {
+async function containerAction(vpsId, containerId, action, btn) {
     if (!isOperator()) { showToast('Permission denied', 'error'); return; }
+    // Show loading state on the clicked button
+    if (btn) {
+        btn.disabled = true;
+        const icon = btn.querySelector('.material-icons');
+        const origHtml = btn.innerHTML;
+        btn.dataset.origHtml = origHtml;
+        if (icon) {
+            icon.textContent = 'hourglass_top';
+            icon.classList.add('spin');
+        } else {
+            btn.innerHTML = '<span class="material-icons spin" style="font-size:16px">hourglass_top</span>';
+        }
+    }
     try {
         const r = await api('POST', `/vps/${vpsId}/containers/${containerId}/action`, { action });
         if (r.success) {
             loadContainers(vpsId);
         } else {
             showToast('Error: ' + (r.error || 'Action failed'), 'error');
+            if (btn) {
+                btn.disabled = false;
+                if (btn.dataset.origHtml) btn.innerHTML = btn.dataset.origHtml;
+            }
         }
     } catch (err) {
         showToast('Error: ' + err.message, 'error');
+        if (btn) {
+            btn.disabled = false;
+            if (btn.dataset.origHtml) btn.innerHTML = btn.dataset.origHtml;
+        }
     }
+}
+
+// ─── Confirm & Delete Container ─────────────────────────────
+function confirmDeleteContainer(vpsId, containerId, name) {
+    showConfirm(`Are you sure you want to remove container <strong>${escHtml(name)}</strong>? This action cannot be undone.`, () => {
+        containerAction(vpsId, containerId, 'remove');
+    });
+}
+
+// ─── ANSI to HTML ───────────────────────────────────────────
+function ansiToHtml(text) {
+    const ansiMap = {
+        '0': 'close',
+        '1': 'font-weight:700',
+        '3': 'font-style:italic',
+        '4': 'text-decoration:underline',
+        '30': 'color:#4f545c', '31': 'color:#e06c75', '32': 'color:#98c379',
+        '33': 'color:#e5c07b', '34': 'color:#61afef', '35': 'color:#c678dd',
+        '36': 'color:#56b6c2', '37': 'color:#abb2bf',
+        '90': 'color:#5c6370', '91': 'color:#e06c75', '92': 'color:#98c379',
+        '93': 'color:#e5c07b', '94': 'color:#61afef', '95': 'color:#c678dd',
+        '96': 'color:#56b6c2', '97': 'color:#abb2bf',
+    };
+    let html = escHtml(text);
+    // strip non-SGR escape sequences
+    html = html.replace(/\x1b\[[0-9;]*[A-Za-ln-z]/g, '');
+    // handle combined SGR codes: \x1b[1;31m, \x1b[0m, \x1b[31m, etc.
+    html = html.replace(/\x1b\[([0-9;]*)m/g, (match, codes) => {
+        if (!codes || codes === '0') return '</span>';
+        const parts = codes.split(';');
+        const styles = parts.map(c => ansiMap[c]).filter(Boolean);
+        if (styles.length === 0) return '';
+        return `<span style="${styles.join(';')}">`;
+    });
+    // close any unclosed spans at EOF (crude but handles most cases)
+    const openCount = (html.match(/<span /g) || []).length;
+    const closeCount = (html.match(/<\/span>/g) || []).length;
+    if (openCount > closeCount) html += '</span>'.repeat(openCount - closeCount);
+    return html;
 }
 
 // ─── Container Logs Modal ───────────────────────────────────
@@ -1173,9 +1379,9 @@ async function showContainerLogs(vpsId, containerId, name) {
 
     try {
         const logs = await api('GET', `/vps/${vpsId}/containers/${containerId}/logs?tail=${document.getElementById('containerLogTail').value}`);
-        document.getElementById('containerLogViewer').textContent = logs;
+        document.getElementById('containerLogViewer').innerHTML = ansiToHtml(logs);
     } catch (err) {
-        document.getElementById('containerLogViewer').textContent = 'Error: ' + err.message;
+        document.getElementById('containerLogViewer').innerHTML = ansiToHtml('Error: ' + err.message);
     }
 }
 
@@ -1187,9 +1393,9 @@ async function loadContainerLogsWithTail() {
     document.getElementById('containerLogViewer').textContent = 'Loading...';
     try {
         const logs = await api('GET', `/vps/${vpsId}/containers/${containerId}/logs?tail=${tail}`);
-        document.getElementById('containerLogViewer').textContent = logs;
+        document.getElementById('containerLogViewer').innerHTML = ansiToHtml(logs);
     } catch (err) {
-        document.getElementById('containerLogViewer').textContent = 'Error: ' + err.message;
+        document.getElementById('containerLogViewer').innerHTML = ansiToHtml('Error: ' + err.message);
     }
 }
 
@@ -1206,13 +1412,37 @@ async function showContainerStats(vpsId, containerId, name) {
     try {
         const s = await api('GET', `/vps/${vpsId}/containers/${containerId}/stats`);
         if (s.error) throw new Error(s.error);
-        document.getElementById('containerStatsBody').innerHTML = `<div class="info-grid">
-            <div class="info-item"><div class="info-label">CPU</div><div class="info-value">${esc(s.cpu)}</div></div>
-            <div class="info-item"><div class="info-label">Memory</div><div class="info-value">${esc(s.mem_usage)} (${esc(s.mem_percent)})</div></div>
-            <div class="info-item"><div class="info-label">Network I/O</div><div class="info-value">${esc(s.net_io)}</div></div>
-            <div class="info-item"><div class="info-label">Block I/O</div><div class="info-value">${esc(s.block_io)}</div></div>
-            <div class="info-item"><div class="info-label">PIDs</div><div class="info-value">${esc(s.pids)}</div></div>
-        </div>`;
+
+        const cpuVal = parseFloat(s.cpu) || 0;
+        const memVal = parseFloat(s.mem_percent) || 0;
+        const cpuColor = cpuVal > 80 ? 'var(--danger)' : cpuVal > 50 ? 'var(--warning)' : 'var(--success)';
+        const memColor = memVal > 80 ? 'var(--danger)' : memVal > 50 ? 'var(--warning)' : 'var(--success)';
+
+        document.getElementById('containerStatsBody').innerHTML = `
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">🧠 CPU</div>
+                    <div class="stat-value">${esc(s.cpu)}</div>
+                    <div class="stat-bar"><div class="stat-bar-fill" style="width:${Math.min(cpuVal, 100)}%;background:${cpuColor}"></div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">💾 Memory</div>
+                    <div class="stat-value">${esc(s.mem_usage)} <span class="stat-percent">(${esc(s.mem_percent)})</span></div>
+                    <div class="stat-bar"><div class="stat-bar-fill" style="width:${Math.min(memVal, 100)}%;background:${memColor}"></div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">📡 Network I/O</div>
+                    <div class="stat-value">${esc(s.net_io)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">💽 Block I/O</div>
+                    <div class="stat-value">${esc(s.block_io)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">🔢 PIDs</div>
+                    <div class="stat-value">${esc(s.pids)}</div>
+                </div>
+            </div>`;
     } catch (err) {
         document.getElementById('containerStatsBody').innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
     }
@@ -1339,12 +1569,21 @@ function connectTerminal(targetVpsId) {
     const wsUrl = `${protocol}//${location.host}/ws/terminal/${vpsId}`;
     const ws = new WebSocket(wsUrl);
     session.ws = ws;
+    session.reconnectAttempt = 0;
+    session.pingInterval = null;
 
     // Update status
     updateTerminalStatus('Connecting...', 'var(--warning)');
     switchTerminalSession(vpsId);
 
+    // Clear any existing reconnect timer
+    if (session._reconnectTimer) {
+        clearTimeout(session._reconnectTimer);
+        session._reconnectTimer = null;
+    }
+
     ws.onopen = () => {
+        session.reconnectAttempt = 0;
         updateTerminalStatus('Connected', 'var(--success)');
         term.clear();
         term.focus();
@@ -1370,6 +1609,14 @@ function connectTerminal(targetVpsId) {
                 ws.send(JSON.stringify({ type: 'resize', cols, rows }));
             }
         });
+
+        // Start ping interval (every 30s)
+        if (session.pingInterval) clearInterval(session.pingInterval);
+        session.pingInterval = setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ping' }));
+            }
+        }, 30000);
     };
 
     ws.onmessage = (event) => {
@@ -1380,6 +1627,13 @@ function connectTerminal(targetVpsId) {
                 const msg = JSON.parse(event.data);
                 if (msg.type === 'connected') {
                     term.writeln(`\r\n${msg.message}\r\n`);
+                } else if (msg.type === 'pong') {
+                    // Server responded to our ping — connection healthy
+                } else if (msg.type === 'ping') {
+                    // Server keepalive — respond
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'pong' }));
+                    }
                 } else if (msg.error) {
                     term.writeln(`\r\nError: ${msg.error}\r\n`);
                 }
@@ -1390,6 +1644,10 @@ function connectTerminal(targetVpsId) {
     };
 
     ws.onclose = () => {
+        if (session.pingInterval) {
+            clearInterval(session.pingInterval);
+            session.pingInterval = null;
+        }
         if (terminalSessions[vpsId]) {
             terminalSessions[vpsId].ws = null;
         }
@@ -1397,11 +1655,22 @@ function connectTerminal(targetVpsId) {
             updateTerminalStatus('Disconnected', 'var(--danger)');
         }
         updateSessionTabStatus(vpsId, false);
+
+        // Auto-reconnect with exponential backoff (max 30s)
+        const maxDelay = 30000;
+        const delay = Math.min(1000 * Math.pow(2, session.reconnectAttempt || 0), maxDelay);
+        session.reconnectAttempt = (session.reconnectAttempt || 0) + 1;
+        session._reconnectTimer = setTimeout(() => {
+            if (activeTerminalSession === vpsId) {
+                updateTerminalStatus(`Reconnecting... (attempt ${session.reconnectAttempt})`, 'var(--warning)');
+            }
+            connectTerminal(vpsId);
+        }, delay);
     };
 
     ws.onerror = () => {
         if (activeTerminalSession === vpsId) {
-            updateTerminalStatus('Error', 'var(--danger)');
+            updateTerminalStatus('Connection Error', 'var(--danger)');
         }
     };
 }
@@ -1416,6 +1685,8 @@ function disconnectTerminal() {
     }
     const session = terminalSessions[activeTerminalSession];
     if (session) {
+        if (session.pingInterval) { clearInterval(session.pingInterval); session.pingInterval = null; }
+        if (session._reconnectTimer) { clearTimeout(session._reconnectTimer); session._reconnectTimer = null; }
         if (session.terminal && session.terminal._inputDisposable) { session.terminal._inputDisposable.dispose(); session.terminal._inputDisposable = null; }
         if (session.terminal && session.terminal._resizeDisposable) { session.terminal._resizeDisposable.dispose(); session.terminal._resizeDisposable = null; }
         if (session.ws) { session.ws.close(); session.ws = null; }
@@ -1723,7 +1994,7 @@ async function loadUsersList() {
         usersList = users;
         const tbody = document.getElementById('usersTableBody');
         if (!users || users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">No users found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">No users found.</td></tr>';
             return;
         }
         tbody.innerHTML = users.map(u => {
@@ -1748,6 +2019,9 @@ async function loadUsersList() {
             <td>${u.active !== false
                 ? '<span style="color:var(--success)">Active</span>'
                 : '<span style="color:var(--danger)">Disabled</span>'}</td>
+            <td>${u.totp_enabled
+                ? '<span style="color:var(--success)">🔐 Enabled</span>'
+                : '<span style="color:var(--text-muted)">—</span>'}</td>
             <td class="action-btns">
                 <button class="btn btn-xs" onclick="showEditUserModal('${u.id}')">Edit</button>
                 <button class="btn btn-xs" onclick="showUserVPSAccessModal('${u.id}')" title="VPS Access">VPS Access</button>
@@ -1794,19 +2068,23 @@ function closeUserModal() {
 async function saveUser(e) {
     e.preventDefault();
     const editId = document.getElementById('userEditId').value;
-    const data = {
-        username: document.getElementById('userUsername').value,
-        display_name: document.getElementById('userDisplayName').value || '',
-        role: document.getElementById('userRole').value || 'viewer',
-    };
+    const username = document.getElementById('userUsername').value.trim();
+    const display_name = document.getElementById('userDisplayName').value.trim() || '';
+    const role = document.getElementById('userRole').value || 'viewer';
     const password = document.getElementById('userPassword').value;
-    if (password) data.password = password;
 
+    // Client-side validation
+    if (!username) { showToast('Username is required', 'warning'); return; }
+    if (username.length < 3) { showToast('Username must be at least 3 characters', 'warning'); return; }
+    if (!editId && !password) { showToast('Password is required for new users', 'warning'); return; }
+    if (!editId && password.length < 6) { showToast('Password must be at least 6 characters', 'warning'); return; }
+
+    const data = { username, display_name, role };
+    if (password) data.password = password;
     try {
         if (editId) {
             await api('PUT', `/users/${editId}`, data);
         } else {
-            if (!password) { showToast('Password is required for new users', 'warning'); return; }
             await api('POST', '/users', data);
         }
         closeUserModal();
@@ -2029,27 +2307,53 @@ function closeSSHKeyModal() {
     document.getElementById('sshKeyModal').classList.add('hidden');
 }
 
+function sshKeyShowError(fieldId, msg) {
+    const el = document.getElementById(fieldId);
+    el.style.borderColor = 'var(--danger)';
+    // Remove any existing error msg
+    const existing = el.parentNode.querySelector('.field-error');
+    if (existing) existing.remove();
+    if (msg) {
+        const err = document.createElement('div');
+        err.className = 'field-error';
+        err.textContent = msg;
+        err.style.cssText = 'color:var(--danger);font-size:11px;margin-top:3px;';
+        el.parentNode.appendChild(err);
+    }
+}
+function sshKeyClearErrors() {
+    ['sshKeyName','sshKeyFile','sshPrivateKey','sshPublicKey'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.borderColor = '';
+        const existing = el?.parentNode?.querySelector('.field-error');
+        if (existing) existing.remove();
+    });
+}
+
 async function saveSSHKey() {
+    sshKeyClearErrors();
     const name = document.getElementById('sshKeyName').value.trim();
     const keyFile = document.getElementById('sshKeyFile').value.trim();
     const privateKey = document.getElementById('sshPrivateKey').value.trim();
     const publicKey = document.getElementById('sshPublicKey').value.trim();
+    let valid = true;
     
-    if (!name) { showToast('Key name is required', 'warning'); return; }
+    if (!name) { sshKeyShowError('sshKeyName', 'Key name is required'); valid = false; }
 
     // Validate based on mode
     if (sshKeyInputMode === 'file' && !keyFile) {
-        showToast('Private key file path is required', 'warning');
-        return;
+        sshKeyShowError('sshKeyFile', 'Private key file path is required');
+        valid = false;
     }
     if (sshKeyInputMode === 'pasted' && !privateKey) {
-        showToast('Private key content is required', 'warning');
-        return;
+        sshKeyShowError('sshPrivateKey', 'Private key content is required');
+        valid = false;
     }
     if (sshKeyInputMode === 'public_only' && !publicKey) {
-        showToast('Public key content is required', 'warning');
-        return;
+        sshKeyShowError('sshPublicKey', 'Public key content is required');
+        valid = false;
     }
+    if (!valid) return;
 
     try {
         const payload = {
@@ -2526,11 +2830,25 @@ async function loadGroupDropdown() {
 
 // ─── Audit Logs (Admin Only) ──────────────────────────────
 // ═══════════════════════════════════════════════════════════
-
 let _auditFilterTimer = null;
+const AUDIT_PAGE_SIZE = 50;
+let auditPageOffset = 0;
+
 function debounceAuditFilter() {
     clearTimeout(_auditFilterTimer);
-    _auditFilterTimer = setTimeout(loadAuditLogs, 400);
+    _auditFilterTimer = setTimeout(() => { auditPageOffset = 0; loadAuditLogs(); }, 400);
+}
+
+function prevAuditPage() {
+    if (auditPageOffset > 0) {
+        auditPageOffset = Math.max(0, auditPageOffset - AUDIT_PAGE_SIZE);
+        loadAuditLogs();
+    }
+}
+
+function nextAuditPage() {
+    auditPageOffset += AUDIT_PAGE_SIZE;
+    loadAuditLogs();
 }
 
 function formatAuditAction(action) {
@@ -2548,6 +2866,29 @@ function formatAuditAction(action) {
         'user_delete': '🗑️ User Delete',
         'exec_command': '⌨️ Exec Command',
         'terminal_connect': '💻 Terminal Connect',
+        'bulk_command': '📦 Bulk Command',
+        'sshkey_create': '🔑 SSH Key Create',
+        'sshkey_delete': '🔑 SSH Key Delete',
+        'group_create': '👥 Group Create',
+        'group_update': '👥 Group Update',
+        'group_delete': '👥 Group Delete',
+        'compose_up': '🐳 Compose Up',
+        'compose_down': '🐳 Compose Down',
+        'compose_restart': '🐳 Compose Restart',
+        'crontab_update': '⏰ Crontab Update',
+        'cronjob_create': '⏰ Cron Job Create',
+        'script_create': '📜 Script Create',
+        'script_run': '▶️ Script Run',
+        'script_update': '📝 Script Update',
+        'script_delete': '🗑️ Script Delete',
+        'github_token_create': '🐙 GitHub Token',
+        'github_repo_add': '🐙 GitHub Repo',
+        'totp_setup_started': '🔐 TOTP Setup',
+        'totp_disabled': '🔐 TOTP Disable',
+        'oidc_error': '🔗 OIDC Error',
+        'user_vps_access_update': '🔒 VPS Access Update',
+        'user_group_update': '👥 Group Access Update',
+        'invite_generated': '📨 Invite Generated',
     };
     return map[action] || action;
 }
@@ -2556,7 +2897,7 @@ async function loadAuditLogs() {
     if (!isAdmin()) return;
     const filter = document.getElementById('auditActionFilter')?.value || '';
     const userFilter = document.getElementById('auditUserFilter')?.value || '';
-    let url = `/audit-logs?limit=200`;
+    let url = `/audit-logs?limit=${AUDIT_PAGE_SIZE}&offset=${auditPageOffset}`;
     if (filter) url += `&action=${encodeURIComponent(filter)}`;
     if (userFilter) url += `&user=${encodeURIComponent(userFilter)}`;
 
@@ -2568,6 +2909,16 @@ async function loadAuditLogs() {
         const countEl = document.getElementById('auditTotalCount');
         if (countEl) countEl.textContent = `${data.total} log entries`;
 
+        // Update pagination
+        const pageInfo = document.getElementById('auditPageInfo');
+        const prevBtn = document.getElementById('auditPrevBtn');
+        const nextBtn = document.getElementById('auditNextBtn');
+        const currentPage = Math.floor(auditPageOffset / AUDIT_PAGE_SIZE) + 1;
+        const totalPages = Math.ceil(data.total / AUDIT_PAGE_SIZE);
+        if (pageInfo) pageInfo.textContent = `Page ${currentPage} of ${totalPages || 1} (${data.logs.length} shown)`;
+        if (prevBtn) prevBtn.style.display = auditPageOffset > 0 ? 'inline-flex' : 'none';
+        if (nextBtn) nextBtn.style.display = (auditPageOffset + AUDIT_PAGE_SIZE) < data.total ? 'inline-flex' : 'none';
+
         if (!data.logs || data.logs.length === 0) {
             tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted)">No audit logs found.</td></tr>';
             return;
@@ -2576,7 +2927,7 @@ async function loadAuditLogs() {
         tbody.innerHTML = data.logs.map(log => {
             const ts = log.timestamp ? new Date(log.timestamp).toLocaleString() : '-';
             const detailsFormatted = log.details ? Object.entries(log.details).map(([k,v]) => `${k}: ${v}`).join(' · ') : '';
-            const resourceStr = log.resource_type ? `${esc(log.resource_type)}${log.resource_id ? ': ' + esc(log.resource_id.substring(0, 8)) : ''}` : '-';
+            const resourceStr = log.resource_type ? `${esc(log.resource_type)}${log.resource_name ? ': ' + esc(log.resource_name) : (log.resource_id ? ': ' + esc(log.resource_id.substring(0, 8)) : '')}` : '-';
             return `<tr>
                 <td style="white-space:nowrap;font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">${esc(ts)}</td>
                 <td><strong>${esc(log.username)}</strong></td>
@@ -2608,6 +2959,20 @@ function escHtml(s) {
 window.addEventListener('resize', () => {
     fitActiveTerminal();
 });
+
+// ─── Loading State Helper ───────────────────────────────────
+function setLoading(btnId, loading, text) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    if (loading) {
+        btn._origText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner"></span> ${text || 'Saving...'}`;
+    } else {
+        btn.disabled = false;
+        btn.innerHTML = btn._origText || text || 'Save';
+    }
+}
 
 // ─── Toast Notification System ─────────────────────────────
 const toastIcons = {
@@ -2646,7 +3011,7 @@ function dismissToast(toast) {
 let _confirmCallback = null;
 
 function showConfirm(message, onConfirm) {
-    document.getElementById('confirmMessage').textContent = message;
+    document.getElementById('confirmMessage').innerHTML = message;
     _confirmCallback = onConfirm;
     document.getElementById('confirmModal').classList.remove('hidden');
 }
@@ -2669,20 +3034,67 @@ function showAuditDetail(el) {
     const jsonEl = document.getElementById('auditDetailJson');
 
     const ts = log.timestamp ? new Date(log.timestamp).toLocaleString() : '-';
-    const resourceStr = log.resource_type ? `${log.resource_type}${log.resource_id ? ': ' + log.resource_id.substring(0, 8) : ''}` : '-';
+    const resourceStr = log.resource_type ? `${log.resource_type}${log.resource_name ? ': ' + log.resource_name : (log.resource_id ? ': ' + log.resource_id.substring(0, 12) : '')}` : '-';
+
+    // Enhanced display with icons and grouped info cards
+    const actionParts = (log.action || '').split('_');
+    const actionIconMap = {
+        'login': 'login', 'logout': 'logout', 'vps': 'dns',
+        'container': 'view_in_ar', 'user': 'person', 'system': 'settings',
+        'compose': 'layers', 'exec': 'terminal', 'terminal': 'terminal',
+        'sshkey': 'vpn_key', 'group': 'folder', 'bulk': 'select_all',
+        'oidc': 'open_in_new',
+    };
+    const actionIcon = actionIconMap[actionParts[0]] || 'info';
 
     metaEl.innerHTML = `
-        <dt>Timestamp</dt><dd>${escHtml(ts)}</dd>
-        <dt>User</dt><dd>${escHtml(log.username)}</dd>
-        <dt>Action</dt><dd>${escHtml(log.action)}</dd>
-        <dt>Resource</dt><dd>${escHtml(resourceStr)}</dd>
-        <dt>IP</dt><dd>${escHtml(log.ip_address || '-')}</dd>
+        <div class="audit-card-row">
+            <div class="audit-detail-card">
+                <div class="audit-card-icon"><span class="material-icons" style="font-size:20px;color:var(--primary)">schedule</span></div>
+                <div class="audit-card-label">Timestamp</div>
+                <div class="audit-card-value">${escHtml(ts)}</div>
+            </div>
+            <div class="audit-detail-card">
+                <div class="audit-card-icon"><span class="material-icons" style="font-size:20px;color:var(--success)">person</span></div>
+                <div class="audit-card-label">User</div>
+                <div class="audit-card-value">${escHtml(log.username)}</div>
+            </div>
+        </div>
+        <div class="audit-card-row">
+            <div class="audit-detail-card">
+                <div class="audit-card-icon"><span class="material-icons" style="font-size:20px;color:var(--warning)">${actionIcon}</span></div>
+                <div class="audit-card-label">Action</div>
+                <div class="audit-card-value">${escHtml(formatAuditAction(log.action))}</div>
+            </div>
+            <div class="audit-detail-card">
+                <div class="audit-card-icon"><span class="material-icons" style="font-size:20px;color:var(--info)">dns</span></div>
+                <div class="audit-card-label">Resource</div>
+                <div class="audit-card-value">${escHtml(resourceStr)}</div>
+            </div>
+        </div>
+        <div class="audit-card-row">
+            <div class="audit-detail-card">
+                <div class="audit-card-icon"><span class="material-icons" style="font-size:20px;color:var(--text-muted)">language</span></div>
+                <div class="audit-card-label">IP Address</div>
+                <div class="audit-card-value">${escHtml(log.ip_address || '-')}</div>
+            </div>
+            <div class="audit-detail-card" style="visibility:hidden"></div>
+        </div>
     `;
 
     if (log.details && typeof log.details === 'object') {
-        jsonEl.innerHTML = syntaxHighlightJSON(JSON.stringify(log.details, null, 2));
+        // Format details as a readable key-value table instead of raw JSON
+        const entries = Object.entries(log.details);
+        let detailsHtml = '<div class="audit-details-grid">';
+        entries.forEach(([k, v]) => {
+            const label = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            const val = typeof v === 'object' ? JSON.stringify(v) : String(v);
+            detailsHtml += `<div class="audit-detail-item"><span class="audit-detail-key">${escHtml(label)}</span><span class="audit-detail-val">${escHtml(val)}</span></div>`;
+        });
+        detailsHtml += '</div>';
+        jsonEl.innerHTML = detailsHtml;
     } else {
-        jsonEl.textContent = 'No details available';
+        jsonEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">No additional details available for this event.</div>';
     }
 
     document.getElementById('auditDetailModal').classList.remove('hidden');
@@ -3448,8 +3860,9 @@ async function loadScripts() {
             durEl.textContent = stats.avg_duration_ms ? formatDuration(stats.avg_duration_ms) : '—';
             // Category breakdown
             const catStatEl = document.getElementById('scriptStats');
-            if (catStatEl && stats.categories) {
-                const entries = Object.entries(stats.categories);
+            if (catStatEl) {
+                const categories = stats.categories || {};
+                const entries = Object.entries(categories);
                 catStatEl.innerHTML = entries.length > 0
                     ? entries.map(([cat, count]) =>
                         `<div style="display:flex;justify-content:space-between;gap:8px;">
@@ -3457,7 +3870,7 @@ async function loadScripts() {
                             <strong>${count}</strong>
                         </div>`
                       ).join('')
-                    : '<span style="color:var(--text-muted)">No scripts</span>';
+                    : (stats.total_scripts > 0 ? '<span style="color:var(--text-muted)">Uncategorized</span>' : '<span style="color:var(--text-muted)">No scripts</span>');
             }
             // Show "Seed Templates" button when no scripts exist
             const seedBtn = document.getElementById('seedTemplatesBtn') || createSeedBtn();
@@ -3563,7 +3976,8 @@ function renderScriptCards(scripts) {
                 data-desc="${esc(s.description || '')}"
                 data-category="${esc(cat)}"
                 data-sort="${s.created_at || 0}"
-                data-runs="${runCount}">
+                data-runs="${runCount}"
+                data-pinned="${isPinned}">
             <div class="vps-card-header">
                 <div class="vps-card-name">
                     ${isPinned ? '<span class="material-icons" style="font-size:16px;color:var(--warning);margin-right:4px;">star</span>' : ''}
@@ -3907,15 +4321,26 @@ async function openScriptRun(scriptId) {
     }
 
     const accessibleList = filterVPSByAccess(vpsListData);
+
+    // Fetch online status for VPS list
+    const vpsIds = accessibleList.map(v => v.id);
+    let statusMap = {};
+    if (vpsIds.length > 0) {
+        try {
+            statusMap = await api('POST', '/vps/status', { ids: vpsIds });
+        } catch {}
+    }
+
     if (!accessibleList || accessibleList.length === 0) {
         vpsChecklist.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)">No VPS available.</div>';
     } else {
         vpsChecklist.innerHTML = accessibleList.map(v => {
-            const statusDot = v.online ? 'online' : 'offline';
+            const isOnline = statusMap[v.id] === true;
+            const statusDot = isOnline ? 'online' : 'offline';
             return `<label class="checkbox-label" style="display:flex;align-items:center;gap:8px;padding:6px 0;">
                 <input type="checkbox" class="script-vps-checkbox" value="${v.id}" checked>
                 <span class="status-dot ${statusDot}"></span>
-                <span>${esc(v.name)}</span>
+                <span>${esc(v.name)} ${isOnline ? '' : '🔴'}</span>
                 <span style="font-size:11px;color:var(--text-muted)">${esc(v.host)}</span>
             </label>`;
         }).join('');
@@ -4006,8 +4431,10 @@ async function executeScriptRun() {
     }
 
     const btn = document.getElementById('scriptRunExecuteBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="material-icons" style="font-size:16px">hourglass_top</span> Running...';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-icons" style="font-size:16px">hourglass_top</span> Running...';
+    }
 
     try {
         const data = {
@@ -4023,8 +4450,10 @@ async function executeScriptRun() {
     } catch (err) {
         showToast('Script execution failed: ' + err.message, 'error');
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<span class="material-icons" style="font-size:16px">play_arrow</span> Execute';
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-icons" style="font-size:16px">play_arrow</span> Execute';
+        }
     }
 }
 
@@ -4086,10 +4515,18 @@ function closeScriptRunResultsModal() {
 
 // ─── Filter / Sort Scripts ─────────────────────────────────
 
+function setScriptTab(tab) {
+    scriptActiveTab = tab;
+    document.querySelectorAll('.tab[data-tab]').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tab);
+    });
+    filterScripts();
+}
+
 function filterScripts() {
     const search = (document.getElementById('scriptSearchInput')?.value || '').toLowerCase();
     const category = document.getElementById('scriptCategoryFilter')?.value || '';
-    const sort = document.getElementById('scriptSortFilter')?.value || 'newest';
+    const sort = document.getElementById('scriptSortFilter')?.value || 'name';
 
     const cards = document.querySelectorAll('#scriptGrid .script-card');
     const visible = [];
@@ -4098,12 +4535,14 @@ function filterScripts() {
         const name = (card.dataset.name || '').toLowerCase();
         const desc = (card.dataset.desc || '').toLowerCase();
         const cat = card.dataset.category || '';
+        const isPinned = card.dataset.pinned === 'true';
 
         const matchSearch = !search || name.includes(search) || desc.includes(search);
         const matchCat = !category || cat === category;
-        card.style.display = matchSearch && matchCat ? '' : 'none';
+        const matchTab = scriptActiveTab !== 'favorites' || isPinned;
+        card.style.display = matchSearch && matchCat && matchTab ? '' : 'none';
 
-        if (matchSearch && matchCat) visible.push(card);
+        if (matchSearch && matchCat && matchTab) visible.push(card);
     });
 
     // Sort visible cards
@@ -4293,51 +4732,98 @@ function renderComposeFiles(files) {
     const container = document.getElementById('composeFilesContainer');
     if (!container) return;
     if (!files || files.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><p>No docker-compose files found.</p></div>';
+        container.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="empty-icon">📦</div><p>No docker-compose files found.</p></div>';
         return;
     }
-    container.innerHTML = '<div class="container-grid">' + files.map(f => `
-        <div class="container-card" style="cursor:pointer" onclick="loadComposeServices('${currentComposeVpsId}','${esc(f.path)}')">
-            <div class="container-header">
-                <div class="container-name">
-                    <span class="material-icons" style="font-size:18px;color:var(--primary)">description</span>
-                    ${esc(f.name || f.path.split('/').pop())}
+    container.innerHTML = files.map(f => {
+        const safePath = esc(f.path);
+        const projectName = esc(f.project || f.path.split('/').pop());
+        const pathB64 = btoa(unescape(encodeURIComponent(f.path))).replace(/=/g,'').replace(/\//g,'_');
+        return `
+        <div class="compose-card-wrapper">
+            <div class="compose-card" onclick="loadComposeServices('${currentComposeVpsId}','${pathB64}')" data-path="${safePath}">
+                <div class="compose-card-header">
+                    <span class="material-icons" style="font-size:20px;color:var(--primary)">layers</span>
+                    <span class="compose-card-project">${projectName}</span>
+                </div>
+                <div class="compose-card-path">
+                    <span class="material-icons" style="font-size:14px;vertical-align:middle;margin-right:4px;">folder</span>
+                    ${safePath}
                 </div>
             </div>
-            <div class="container-meta">
-                <div>Path: <code>${esc(f.path)}</code></div>
+            <div class="compose-services-panel" id="composeServices_${pathB64}" style="display:none;">
+                <div class="compose-services-header">
+                    <span class="material-icons" style="font-size:16px">view_in_ar</span>
+                    <span class="compose-services-title">Services — <span class="compose-services-subtitle">${projectName}</span></span>
+                </div>
+                <div class="compose-services-body"><div class="loading" style="padding:24px;text-align:center;color:var(--text-muted);">Loading services...</div></div>
             </div>
-        </div>
-    `).join('') + '</div>';
+        </div>`;
+    }).join('');
 }
 
-async function loadComposeServices(vpsId, path) {
-    if (!vpsId || !path) return;
+function loadComposeServices(vpsId, pathB64) {
+    if (!vpsId || !pathB64) return;
     currentComposeVpsId = vpsId;
-    const container = document.getElementById('composeServicesContainer');
-    if (!container) return;
-    container.innerHTML = '<div class="loading">Loading services...</div>';
+    
+    // Decode path from base64
+    let path = pathB64;
     try {
-        const services = await api('GET', `/vps/${vpsId}/compose/ps?path=${encodeURIComponent(path)}`);
-        renderComposeServices(services);
-    } catch (err) {
-        container.innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
+        path = decodeURIComponent(escape(atob(pathB64.replace(/_/g,'/'))));
+    } catch(e) {
+        // fallback to using pathB64 as-is if decoding fails
     }
-}
-
-function renderComposeServices(services) {
-    const container = document.getElementById('composeServicesContainer');
-    if (!container) return;
-    const path = document.getElementById('composeSelectedPath')?.value || '';
-    if (!services || services.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-icon">🐳</div><p>No services found.</p></div>';
+    
+    // Generate the panel ID from path
+    const panelId = 'composeServices_' + pathB64;
+    
+    // Close all other panels
+    document.querySelectorAll('.compose-services-panel').forEach(p => {
+        if (p.id !== panelId) p.style.display = 'none';
+    });
+    
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    
+    // Toggle if already open
+    if (panel.style.display === 'block') {
+        panel.style.display = 'none';
         return;
     }
-    container.innerHTML = '<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Name</th><th>Image</th><th>State</th><th>Ports</th><th>Actions</th></tr></thead><tbody>' +
+    
+    panel.style.display = 'block';
+    const body = panel.querySelector('.compose-services-body');
+    if (!body) return;
+    
+    body.innerHTML = '<div class="loading" style="padding:24px;text-align:center;color:var(--text-muted);">Loading services...</div>';
+    
+    (async () => {
+        try {
+            const services = await api('GET', `/vps/${vpsId}/compose/ps?path=${encodeURIComponent(path)}`);
+            renderComposeServices(services, body, path);
+        } catch (err) {
+            body.innerHTML = `<div class="error-msg" style="margin:16px;">${esc(err.message)}</div>`;
+        }
+    })();
+}
+
+function renderComposeServices(services, body, path) {
+    if (!body) {
+        // Fallback to old global container
+        body = document.getElementById('composeServicesBody');
+    }
+    if (!body) return;
+    
+    if (!services || services.length === 0) {
+        body.innerHTML = '<div class="empty-state" style="padding:24px;"><div class="empty-icon">🐳</div><p>No services found.</p></div>';
+        return;
+    }
+    body.innerHTML = '<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Name</th><th>Image</th><th>State</th><th>Ports</th><th>Actions</th></tr></thead><tbody>' +
         services.map(s => {
             const canAct = isOperator();
             const state = s.state || 'unknown';
             const isRunning = state === 'running';
+            const safePath = escHtml(path);
             return `<tr>
                 <td><strong>${esc(s.name)}</strong></td>
                 <td><code>${esc(s.image || '-')}</code></td>
@@ -4345,12 +4831,12 @@ function renderComposeServices(services) {
                 <td style="font-size:12px;color:var(--text-muted)">${esc(s.ports || '-')}</td>
                 <td class="action-btns">
                     ${canAct ? (isRunning ? `
-                        <button class="btn btn-xs" onclick="composeAction('${currentComposeVpsId}','${esc(path)}','stop')">⏹ Stop</button>
-                        <button class="btn btn-xs" onclick="composeAction('${currentComposeVpsId}','${esc(path)}','restart')">🔄 Restart</button>
+                        <button class="btn btn-xs" onclick="composeAction('${currentComposeVpsId}','${safePath}','stop')">⏹ Stop</button>
+                        <button class="btn btn-xs" onclick="composeAction('${currentComposeVpsId}','${safePath}','restart')">🔄 Restart</button>
                     ` : `
-                        <button class="btn btn-xs btn-primary" onclick="composeAction('${currentComposeVpsId}','${esc(path)}','start')">▶ Start</button>
+                        <button class="btn btn-xs btn-primary" onclick="composeAction('${currentComposeVpsId}','${safePath}','start')">▶ Start</button>
                     `) : ''}
-                    ${canAct ? `<button class="btn btn-xs" onclick="composeAction('${currentComposeVpsId}','${esc(path)}','down')" style="color:var(--danger)">⏹ Down</button>` : ''}
+                    ${canAct ? `<button class="btn btn-xs" onclick="composeAction('${currentComposeVpsId}','${safePath}','down')" style="color:var(--danger)">⏹ Down</button>` : ''}
                 </td>
             </tr>`;
         }).join('') + '</tbody></table></div>';
@@ -4641,6 +5127,47 @@ async function runPortCheck(vpsId) {
 // ─── TOTP 2FA ───────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════
 
+// ─── Settings ──────────────────────────────────────────────
+
+async function loadSettings() {
+    // Load user info
+    try {
+        const r = await api('GET', '/auth/me');
+        const usernameEl = document.getElementById('settingsUsername');
+        const roleEl = document.getElementById('settingsRole');
+        const displayNameEl = document.getElementById('settingsDisplayName');
+        if (usernameEl) usernameEl.textContent = r.username || '-';
+        if (roleEl) {
+            const roleLabels = { admin: '🛡️ Admin', operator: '🔧 Operator', viewer: '👁️ Viewer' };
+            roleEl.textContent = roleLabels[r.role] || r.role || '-';
+        }
+        if (displayNameEl) displayNameEl.textContent = r.display_name || r.username || '-';
+
+        // Also show VPS access count
+        const vpsCountEl = document.getElementById('settingsVpsCount');
+        if (vpsCountEl && r.accessible_vps) {
+            vpsCountEl.textContent = `${r.accessible_vps.length} instance(s)`;
+        }
+        // Show group memberships
+        const groupsEl = document.getElementById('settingsGroups');
+        if (groupsEl) {
+            groupsEl.textContent = (r.group_names && r.group_names.length > 0)
+                ? r.group_names.join(', ')
+                : 'None';
+        }
+        // Show account creation date
+        const createdEl = document.getElementById('settingsCreatedAt');
+        if (createdEl && r.created_at) {
+            createdEl.textContent = timeAgo(r.created_at * 1000) + ' (' + new Date(r.created_at * 1000).toLocaleDateString() + ')';
+        }
+    } catch (err) {
+        console.error('loadSettings error:', err);
+    }
+
+    // Also check TOTP status
+    await checkTotpStatus();
+}
+
 async function checkTotpStatus() {
     const statusEl = document.getElementById('totpStatus');
     if (!statusEl) return;
@@ -4756,10 +5283,21 @@ async function populateVpsSelect(selectId, callback) {
     try {
         const list = await api('GET', '/vps');
         const accessible = filterVPSByAccess(list);
+
+        // Fetch online status
+        const vpsIds = accessible.map(v => v.id);
+        let statusMap = {};
+        if (vpsIds.length > 0) {
+            try {
+                statusMap = await api('POST', '/vps/status', { ids: vpsIds });
+            } catch {}
+        }
+
         accessible.forEach(v => {
             const opt = document.createElement('option');
             opt.value = v.id;
-            opt.textContent = `${v.name} (${v.host})`;
+            const isOnline = statusMap[v.id] === true;
+            opt.textContent = `${isOnline ? '🟢' : '🔴'} ${v.name} (${v.host})`;
             select.appendChild(opt);
         });
         if (callback && typeof callback === 'function') {
@@ -4962,3 +5500,13 @@ function initRefreshHandler() {
 
 // ─── Init ───────────────────────────────────────────────────
 checkAuth();
+
+// Fetch version
+fetch('/api/version')
+    .then(r => r.json())
+    .then(d => {
+        document.getElementById('brandVersion').textContent = d.version || 'v0.1.0';
+        const pv = document.getElementById('pageVersion');
+        if (pv) pv.textContent = `ServerSphere ${d.version || 'v0.1.0'}`;
+    })
+    .catch(() => {});

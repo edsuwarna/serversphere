@@ -574,6 +574,8 @@ async def totp_setup(request: Request):
         user_model.totp_secret = secret
         user_model.totp_enabled = False  # not verified yet
         db.commit()
+        audit_log(request, "totp_setup_started", resource_type="system",
+                  details={"username": user.get("username", "unknown")})
 
         # Generate provisioning URI
         issuer = "ServerSphere"
@@ -624,7 +626,9 @@ async def totp_verify(body: TOTPVerifyBody, request: Request):
         if totp.verify(body.code):
             user_model.totp_enabled = True
             db.commit()
-            return {"success": True, "message": "TOTP enabled successfully"}
+            audit_log(request, "totp_verified", resource_type="system",
+                      details={"username": user.get("username", "unknown")})
+            return {"success": True}
         return {"success": False, "message": "Invalid code"}
     finally:
         db.close()
@@ -642,6 +646,8 @@ async def totp_disable(request: Request):
         user_model.totp_secret = None
         user_model.totp_enabled = False
         db.commit()
+        audit_log(request, "totp_disabled", resource_type="system",
+                  details={"username": user.get("username", "unknown")})
         return {"success": True, "message": "TOTP disabled"}
     except Exception as e:
         db.rollback()
@@ -871,6 +877,7 @@ def _safe_user(user_model: UserModel, db: Session = None) -> dict:
         "group_access": group_ids,
         "group_names": group_names,
         "is_active": user_model.is_active,
+        "totp_enabled": user_model.totp_enabled,
         "created_at": user_model.created_at,
     }
 
@@ -1013,6 +1020,8 @@ async def set_user_access(user_id: str, form: VPSAccessForm, request: Request):
             raise HTTPException(status_code=404, detail="User not found")
         set_user_vps_access(db, user_id, form.vps_access)
         db.refresh(target)
+        audit_log(request, "user_vps_access_update", resource_type="user", resource_id=user_id,
+                  details={"username": target.username, "vps_count": len(form.vps_access)})
         return {"success": True, "user": _safe_user(target, db)}
     except HTTPException:
         raise
@@ -1034,6 +1043,8 @@ async def invite_user(request: Request):
         "created_by": user["id"],
         "expires": time.time() + 86400 * 7,  # 7 days
     }
+    audit_log(request, "invite_generated", resource_type="user",
+              details={"role": body.get("role", "viewer"), "created_by": user["username"]})
     return {"token": token, "url": f"/invite/{token}"}
 
 
@@ -1267,13 +1278,80 @@ async def vps_batch_status(request: Request):
             continue
         vps = manager.get_vps(vid)
         if vps:
-            # Run in thread to not block
             loop = asyncio.get_event_loop()
             status = await loop.run_in_executor(None, manager.test_connection, vps)
             results[vid] = status.get("connected", False)
     return results
 
 
+@app.post("/api/vps/containers/count")
+async def vps_batch_container_count(request: Request):
+    """Get container counts for multiple VPS at once. Body: {"ids": ["id1", "id2"]}"""
+    import asyncio
+    user = require_auth(request)
+    body = await request.json()
+    vps_ids = body.get("ids", [])
+
+    async def get_count(vid):
+        if not check_vps_access(user, vid):
+            return vid, 0
+        vps = manager.get_vps(vid)
+        if not vps:
+            return vid, 0
+        try:
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(None, manager.ssh_pool.execute, vps, "docker ps -q 2>/dev/null | wc -l", 10)
+            count = int(result.get("stdout", "0").strip()) if result.get("success") else 0
+            return vid, count
+        except:
+            return vid, 0
+
+    tasks = [get_count(vid) for vid in vps_ids]
+    gathered = await asyncio.gather(*tasks)
+    return {vid: cnt for vid, cnt in gathered}
+
+
+# ─── Version endpoint ──────────────────────────────────────
+VERSION = os.getenv("SERVERSPHERE_VERSION", "v0.1.0")
+
+
+@app.get("/api/version")
+async def get_version():
+    return {"version": VERSION}
+
+
+@app.post("/api/vps/bulk/delete")
+async def vps_bulk_delete(request: Request):
+    """Delete multiple VPS at once. Admin only. Body: {"vps_ids": ["id1", "id2"]}"""
+    user = get_current_user(request)
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Bulk delete requires admin role")
+
+    body = await request.json()
+    vps_ids = body.get("vps_ids", [])
+
+    if not vps_ids:
+        raise HTTPException(status_code=400, detail="No VPS IDs provided")
+
+    db = SessionLocal()
+    try:
+        deleted = 0
+        for vid in vps_ids:
+            vps = db.query(VPSModel).filter(VPSModel.id == vid).first()
+            if vps and check_vps_access(user, vid):
+                db.delete(vps)
+                deleted += 1
+                audit_log(request, "vps_delete", resource_type="vps", resource_id=vid, details={"bulk": True})
+        db.commit()
+        return {"ok": True, "deleted": deleted}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ─── Bulk Operations: Run commands on multiple VPS ────────────
 # ─── Bulk Operations: Run commands on multiple VPS ────────────
 
 @app.post("/api/vps/bulk/command")
@@ -1366,7 +1444,16 @@ async def container_action(vps_id: str, container_id: str, body: ContainerAction
         raise HTTPException(status_code=400, detail=f"Unknown action: {body.action}")
     r = manager.ssh_pool.execute(vps, cmd, timeout=30)
     if r["success"]:
-        audit_log(request, f"container_{body.action}", resource_type="container", resource_id=container_id, details={"vps_id": vps_id})
+        # Get container name from docker ps for better audit detail
+        container_name = container_id
+        try:
+            name_result = manager.ssh_pool.execute(vps, f"docker inspect --format '{{{{.Name}}}}' {container_id} 2>/dev/null | sed 's|/||'", timeout=5)
+            if name_result["success"] and name_result["stdout"].strip():
+                container_name = name_result["stdout"].strip()
+        except:
+            pass
+        audit_log(request, f"container_{body.action}", resource_type="container", resource_id=container_id,
+                  details={"vps_id": vps_id, "container_name": container_name, "action": body.action})
         return {"success": True, "output": r["stdout"]}
     return {"success": False, "error": r["stderr"]}
 
@@ -1769,12 +1856,21 @@ async def websocket_terminal(websocket: WebSocket, vps_id: str):
             """Read from WebSocket and send to SSH channel."""
             while True:
                 try:
-                    data = await websocket.receive_text()
+                    data = await asyncio.wait_for(websocket.receive_text(), timeout=120)
                     msg = json.loads(data)
-                    if msg.get("type") == "input":
+                    msg_type = msg.get("type", "")
+                    if msg_type == "input":
                         channel.send(msg["data"])
-                    elif msg.get("type") == "resize":
+                    elif msg_type == "resize":
                         channel.resize_pty(msg.get("cols", 80), msg.get("rows", 24))
+                    elif msg_type == "ping":
+                        await websocket.send_json({"type": "pong"})
+                except asyncio.TimeoutError:
+                    # No message for 120s — send keepalive ping to client
+                    try:
+                        await websocket.send_json({"type": "ping"})
+                    except:
+                        break
                 except WebSocketDisconnect:
                     break
                 except Exception:
@@ -1812,14 +1908,25 @@ async def get_audit_logs(request: Request, limit: int = 100, offset: int = 0, ac
         total = query.count()
         logs = query.offset(offset).limit(limit).all()
         result = []
+        # Build vps name lookup once for efficiency
+        all_vps = db.query(VPSModel).all()
+        vps_name_map = {v.id: v.name for v in all_vps}
         for log in logs:
+            details = json.loads(log.details) if log.details else None
+            # Resolve resource_type/resource_id to human-readable name
+            resource_display = None
+            if log.resource_type == "vps" and log.resource_id:
+                resource_display = vps_name_map.get(log.resource_id)
+            elif log.resource_type == "container" and details and "vps_id" in details:
+                details["vps_name"] = vps_name_map.get(details["vps_id"], details["vps_id"])
             result.append({
                 "id": log.id,
                 "username": log.username,
                 "action": log.action,
                 "resource_type": log.resource_type,
                 "resource_id": log.resource_id,
-                "details": json.loads(log.details) if log.details else None,
+                "resource_name": resource_display,
+                "details": details,
                 "ip_address": log.ip_address,
                 "timestamp": log.timestamp.isoformat() if log.timestamp else None,
             })
@@ -2831,6 +2938,40 @@ async def create_script(data: ScriptCreate, request: Request):
         db.close()
 
 
+# Script stats
+@app.get("/api/scripts/stats")
+async def script_stats(request: Request):
+    user = require_auth(request)
+    db = SessionLocal()
+    try:
+        from sqlalchemy import func
+        total_scripts = db.query(ScriptModel).count()
+        total_runs = db.query(ScriptRunModel).count()
+        pinned_count = db.query(ScriptModel).filter(ScriptModel.pinned == True).count()
+        success_runs = db.query(ScriptRunModel).filter(ScriptRunModel.status == "success").count()
+        failed_runs = db.query(ScriptRunModel).filter(ScriptRunModel.status == "failed").count()
+
+        avg_duration = db.query(func.avg(ScriptRunModel.exec_time_ms)).filter(
+            ScriptRunModel.status == "success"
+        ).scalar()
+
+        # Per-category counts
+        categories = db.query(ScriptModel.category, func.count(ScriptModel.id)).group_by(ScriptModel.category).all()
+
+        return {
+            "total_scripts": total_scripts,
+            "total_runs": total_runs,
+            "pinned_count": pinned_count,
+            "success_runs": success_runs,
+            "failed_runs": failed_runs,
+            "success_rate": round((success_runs / total_runs * 100), 1) if total_runs > 0 else 0,
+            "avg_duration_ms": int(avg_duration) if avg_duration else 0,
+            "categories": {c: n for c, n in categories},
+        }
+    finally:
+        db.close()
+
+
 @app.get("/api/scripts/{script_id}")
 async def get_script(script_id: str, request: Request):
     user = require_auth(request)
@@ -3184,40 +3325,6 @@ async def import_script(data: ScriptImport, request: Request):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
-    finally:
-        db.close()
-
-
-# Script stats
-@app.get("/api/scripts/stats")
-async def script_stats(request: Request):
-    user = require_auth(request)
-    db = SessionLocal()
-    try:
-        from sqlalchemy import func
-        total_scripts = db.query(ScriptModel).count()
-        total_runs = db.query(ScriptRunModel).count()
-        pinned_count = db.query(ScriptModel).filter(ScriptModel.pinned == True).count()
-        success_runs = db.query(ScriptRunModel).filter(ScriptRunModel.status == "success").count()
-        failed_runs = db.query(ScriptRunModel).filter(ScriptRunModel.status == "failed").count()
-
-        avg_duration = db.query(func.avg(ScriptRunModel.exec_time_ms)).filter(
-            ScriptRunModel.status == "success"
-        ).scalar()
-
-        # Per-category counts
-        categories = db.query(ScriptModel.category, func.count(ScriptModel.id)).group_by(ScriptModel.category).all()
-
-        return {
-            "total_scripts": total_scripts,
-            "total_runs": total_runs,
-            "pinned_count": pinned_count,
-            "success_runs": success_runs,
-            "failed_runs": failed_runs,
-            "success_rate": round((success_runs / total_runs * 100), 1) if total_runs > 0 else 0,
-            "avg_duration_ms": int(avg_duration) if avg_duration else 0,
-            "categories": {c: n for c, n in categories},
-        }
     finally:
         db.close()
 
