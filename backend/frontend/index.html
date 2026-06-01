@@ -276,7 +276,7 @@
                                 <button class="btn btn-sm" onclick="bulkQuickAction('uptime')" title="System uptime">
                                     ⏱ Uptime
                                 </button>
-                                <button class="btn btn-sm" onclick='bulkQuickAction("docker ps --format \"table {{.Names}}\t{{.Status}}\t{{.Image}}\"')' title="Docker containers">
+                                <button class="btn btn-sm" onclick='bulkQuickAction(`docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"`)' title="Docker containers">
                                     🐳 Docker PS
                                 </button>
                                 <button class="btn btn-sm" onclick="bulkQuickAction('df -h /')" title="Disk usage">
@@ -904,6 +904,7 @@
                             <span class="material-icons empty-icon" style="font-size:48px;color:var(--text-muted)">layers</span>
                             <p style="color:var(--text-muted);">Select a VPS to view Docker Compose files.</p>
                         </div>
+                        <h4 id="composeFilesHeading" style="margin:0 0 12px;font-size:14px;font-weight:600;display:none;">Compose Files</h4>
                         <div id="composeFilesContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">
                             <!-- Compose file cards rendered dynamically by JS -->
                         </div>
@@ -1028,6 +1029,9 @@
                         <select id="networkVpsSelect">
                             <option value="">-- Select VPS --</option>
                         </select>
+                        <small style="color:var(--text-muted);font-size:11px;margin-top:4px;display:block;">
+                            Select a VPS first — all network tools run via SSH on the chosen instance
+                        </small>
                     </div>
 
                     <!-- Ping Tool -->
@@ -1186,6 +1190,7 @@
                             <h3>User Information</h3>
                         </div>
                         <div class="card-body">
+                            <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Your account profile details. Contact your administrator to update these fields.</p>
                             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
                                 <div>
                                     <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Username</label>
@@ -1546,7 +1551,7 @@
                 <!-- File Path Mode -->
                 <div id="sshKeyFileSection" class="form-group" style="margin-top:12px;">
                     <label>Private Key File Path *</label>
-                    <input type="text" id="sshKeyFile" placeholder="/root/.ssh/id_rsa">
+                    <input type="text" id="sshKeyFile" placeholder="e.g. /root/.ssh/id_rsa">
                     <small style="color:var(--text-muted);font-size:11px;margin-top:4px;display:block;">Path to the private key file on the dashboard server</small>
                 </div>
 
@@ -2272,6 +2277,6 @@
         </div>
     </div>
 
-    <script src="/js/app.js?v=26"></script>
+    <script src="/js/app.js?v=28"></script>
 </body>
 </html>

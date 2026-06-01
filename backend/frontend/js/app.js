@@ -368,15 +368,27 @@ async function refreshDashboard() {
 
         let html = '';
         for (const v of vpsList) {
-            html += `<div class="vps-card" onclick="showVPSDetail('${v.id}')">
+            const onlineBadge = v.online
+                ? `<span class="vps-badge online">🟢 Online</span>`
+                : `<span class="vps-badge offline">🔴 Offline</span>`;
+            html += `<div class="vps-card ${v.online ? 'vps-card-online' : ''}" onclick="showVPSDetail('${v.id}')">
                 <div class="vps-card-header">
                     <div class="vps-card-name">
                         <span class="status-dot ${v.online ? 'online' : 'offline'}"></span>
                         ${esc(v.name)}
                     </div>
-                    <span style="font-size:12px;color:var(--text-muted)">${esc(v.group)}</span>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        ${onlineBadge}
+                        ${v.group ? `<span class="vps-group-tag">${esc(v.group)}</span>` : ''}
+                    </div>
                 </div>
-                <div class="vps-card-host">${esc(v.host)}:${v.port} · ${esc(v.username)}</div>
+                <div class="vps-card-host">
+                    <span class="material-icons" style="font-size:14px;vertical-align:middle;color:var(--text-muted)">dns</span>
+                    ${esc(v.host)}:${v.port} · ${esc(v.username)}
+                </div>
+                <div class="vps-card-resources" id="vps-res-${v.id}">
+                    <div class="resource-item-placeholder">Loading resources...</div>
+                </div>
                 ${v.tags && v.tags.length ? `<div class="vps-card-tags">${v.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
             </div>`;
         }
@@ -395,10 +407,10 @@ async function refreshDashboard() {
 async function loadCardResources(vpsId) {
     try {
         const r = await api('GET', `/vps/${vpsId}/resources`);
-        const card = document.querySelector(`.vps-card[onclick*="${vpsId}"]`);
-        if (!card || r.error) return;
+        const resEl = document.getElementById(`vps-res-${vpsId}`);
+        if (!resEl || r.error) return;
 
-        let resHtml = '<div class="vps-card-resources">';
+        let resHtml = '';
         if (r.cpu_percent !== undefined) {
             const color = r.cpu_percent > 80 ? 'var(--danger)' : r.cpu_percent > 60 ? 'var(--warning)' : 'var(--success)';
             resHtml += `<div class="resource-item">CPU: <span>${r.cpu_percent}%</span>
@@ -415,13 +427,7 @@ async function loadCardResources(vpsId) {
             resHtml += `<div class="resource-item">Disk: <span>${r.disk.percent}%</span>
                 <div class="resource-bar"><div class="resource-bar-fill" style="width:${r.disk.percent}%;background:${color}"></div></div></div>`;
         }
-        resHtml += '</div>';
-        const tagsEl = card.querySelector('.vps-card-tags');
-        if (tagsEl) {
-            tagsEl.insertAdjacentHTML('beforebegin', resHtml);
-        } else {
-            card.insertAdjacentHTML('beforeend', resHtml);
-        }
+        resEl.innerHTML = resHtml || '<div style="font-size:11px;color:var(--text-muted)">No resource data</div>';
     } catch {}
 }
 
@@ -1015,10 +1021,25 @@ async function loadVPSInfo(vpsId) {
 
 async function loadVPSResources(vpsId) {
     try {
-        const r = await api('GET', `/vps/${vpsId}/resources`);
+        // Fetch resources and info in parallel for uptime
+        const [r, info] = await Promise.all([
+            api('GET', `/vps/${vpsId}/resources`),
+            api('GET', `/vps/${vpsId}/info`).catch(() => null)
+        ]);
         if (r.error) throw new Error(r.error);
 
         let html = '<div class="resource-grid">';
+
+        // Uptime display
+        if (info && info.uptime) {
+            html += `<div class="resource-row">
+                <div class="resource-icon">⏱️</div>
+                <div class="resource-info">
+                    <div class="resource-title">Uptime</div>
+                    <div class="resource-value resource-uptime">${esc(info.uptime)}</div>
+                </div>
+            </div>`;
+        }
 
         // CPU
         const cpuPct = r.cpu_percent || 0;
@@ -1040,7 +1061,7 @@ async function loadVPSResources(vpsId) {
                 <div class="resource-icon">💾</div>
                 <div class="resource-info">
                     <div class="resource-title">Memory</div>
-                    <div class="resource-value">${r.memory.used_mb}MB / ${r.memory.total_mb}MB (${memPct}%)</div>
+                    <div class="resource-value">${r.memory.used_mb} MB / ${r.memory.total_mb} MB (${memPct}%)</div>
                     <div class="resource-bar-lg"><div class="resource-bar-lg-fill" style="width:${memPct}%;background:${memColor}"></div></div>
                 </div>
             </div>`;
@@ -1098,7 +1119,7 @@ async function loadContainers(vpsId) {
         }
 
         el.innerHTML = '<div class="container-grid">' + containers.map(c => `
-            <div class="container-card">
+            <div class="container-card ${c.state}">
                 <div class="container-header">
                     <div class="container-name">
                         <span class="container-state ${c.state}">${c.state}</span>
@@ -4248,7 +4269,12 @@ async function loadComposeFiles(vpsId) {
     if (!vpsId) return;
     currentComposeVpsId = vpsId;
     const container = document.getElementById('composeFilesContainer');
+    const emptyState = document.getElementById('composeEmptyState');
+    const heading = document.getElementById('composeFilesHeading');
     if (!container) return;
+    // Hide empty state, show heading
+    if (emptyState) emptyState.style.display = 'none';
+    if (heading) heading.style.display = '';
     container.innerHTML = '<div class="loading">Loading compose files...</div>';
     try {
         const files = await api('GET', `/vps/${vpsId}/compose/files`);
@@ -4543,54 +4569,57 @@ async function saveCronJob() {
 // ═══════════════════════════════════════════════════════════════
 
 async function runPing(vpsId) {
-    if (!vpsId) return;
+    if (!vpsId) { showToast('Please select a VPS first', 'warning'); return; }
     currentNetworkVpsId = vpsId;
     const target = document.getElementById('pingTarget')?.value || '8.8.8.8';
     const count = document.getElementById('pingCount')?.value || 4;
     const resultEl = document.getElementById('pingResult');
     if (!resultEl) return;
+    resultEl.style.display = 'block';
     resultEl.innerHTML = '<div class="loading">Running ping...</div>';
     try {
         const r = await api('POST', `/vps/${vpsId}/network/ping`, { target, count: parseInt(count) });
-        resultEl.innerHTML = `<pre class="code-block" style="max-height:400px;overflow-y:auto;">${esc(r.output || r.result || 'No output')}</pre>`;
+        resultEl.innerHTML = `<pre class="code-block" style="max-height:400px;overflow-y:auto;">${esc(r.output || (r.error ? '⚠ Error: ' + r.error : '') || 'No output')}</pre>`;
     } catch (err) {
         resultEl.innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
     }
 }
 
 async function runTraceroute(vpsId) {
-    if (!vpsId) return;
+    if (!vpsId) { showToast('Please select a VPS first', 'warning'); return; }
     currentNetworkVpsId = vpsId;
     const target = document.getElementById('tracerouteTarget')?.value || '8.8.8.8';
     const resultEl = document.getElementById('tracerouteResult');
     if (!resultEl) return;
+    resultEl.style.display = 'block';
     resultEl.innerHTML = '<div class="loading">Running traceroute...</div>';
     try {
         const r = await api('POST', `/vps/${vpsId}/network/traceroute`, { target });
-        resultEl.innerHTML = `<pre class="code-block" style="max-height:400px;overflow-y:auto;">${esc(r.output || r.result || 'No output')}</pre>`;
+        resultEl.innerHTML = `<pre class="code-block" style="max-height:400px;overflow-y:auto;">${esc(r.output || (r.error ? '⚠ Error: ' + r.error : '') || 'No output')}</pre>`;
     } catch (err) {
         resultEl.innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
     }
 }
 
 async function runDnsLookup(vpsId) {
-    if (!vpsId) return;
+    if (!vpsId) { showToast('Please select a VPS first', 'warning'); return; }
     currentNetworkVpsId = vpsId;
     const hostname = document.getElementById('dnsHostname')?.value || 'google.com';
     const recordType = document.getElementById('dnsRecordType')?.value || 'A';
     const resultEl = document.getElementById('dnsResult');
     if (!resultEl) return;
+    resultEl.style.display = 'block';
     resultEl.innerHTML = '<div class="loading">Running DNS lookup...</div>';
     try {
-        const r = await api('POST', `/vps/${vpsId}/network/dns`, { hostname, record_type: recordType });
-        resultEl.innerHTML = `<pre class="code-block" style="max-height:400px;overflow-y:auto;">${esc(r.output || r.result || 'No output')}</pre>`;
+        const r = await api('POST', `/vps/${vpsId}/network/dns`, { domain: hostname, record_type: recordType });
+        resultEl.innerHTML = `<pre class="code-block" style="max-height:400px;overflow-y:auto;">${esc(r.output || (r.error ? '⚠ Error: ' + r.error : '') || 'No output')}</pre>`;
     } catch (err) {
         resultEl.innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
     }
 }
 
 async function runPortCheck(vpsId) {
-    if (!vpsId) return;
+    if (!vpsId) { showToast('Please select a VPS first', 'warning'); return; }
     currentNetworkVpsId = vpsId;
     const host = document.getElementById('portCheckHost')?.value || '';
     const port = document.getElementById('portCheckPort')?.value || 80;
@@ -4598,10 +4627,11 @@ async function runPortCheck(vpsId) {
     const resultEl = document.getElementById('portCheckResult');
     if (!resultEl) return;
     if (!host) { showToast('Please enter a host', 'warning'); return; }
+    resultEl.style.display = 'block';
     resultEl.innerHTML = '<div class="loading">Checking port...</div>';
     try {
-        const r = await api('POST', `/vps/${vpsId}/network/port-check`, { host, port: parseInt(port), protocol });
-        resultEl.innerHTML = `<pre class="code-block" style="max-height:400px;overflow-y:auto;">${esc(r.output || r.result || 'No output')}</pre>`;
+        const r = await api('POST', `/vps/${vpsId}/network/port-check`, { target: host, port: parseInt(port), protocol });
+        resultEl.innerHTML = `<pre class="code-block" style="max-height:400px;overflow-y:auto;">${esc(r.output || (r.error ? '⚠ Error: ' + r.error : '') || 'No output')}</pre>`;
     } catch (err) {
         resultEl.innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
     }
@@ -4687,7 +4717,7 @@ async function verifyTotpSetup(code) {
             closeTotpSetupModal();
             checkTotpStatus();
         } else {
-            showToast('Error: ' + (r.error || 'Verification failed'), 'error');
+            showToast('Error: ' + (r.message || 'Verification failed'), 'error');
         }
     } catch (err) {
         showToast('Error: ' + err.message, 'error');
@@ -4707,7 +4737,7 @@ async function disableTotp() {
                 showToast('2FA disabled', 'success');
                 checkTotpStatus();
             } else {
-                showToast('Error: ' + (r.error || 'Disable failed'), 'error');
+                showToast('Error: ' + (r.message || 'Disable failed'), 'error');
             }
         } catch (err) {
             showToast('Error: ' + err.message, 'error');
@@ -4743,7 +4773,17 @@ async function populateVpsSelect(selectId, callback) {
 function loadVpsComposeList() {
     populateVpsSelect('composeVpsSelect', (vpsId) => {
         currentComposeVpsId = vpsId;
-        if (vpsId) loadComposeFiles(vpsId);
+        if (vpsId) {
+            loadComposeFiles(vpsId);
+        } else {
+            // Show empty state, hide heading
+            const emptyState = document.getElementById('composeEmptyState');
+            const heading = document.getElementById('composeFilesHeading');
+            const container = document.getElementById('composeFilesContainer');
+            if (emptyState) emptyState.style.display = '';
+            if (heading) heading.style.display = 'none';
+            if (container) container.innerHTML = '';
+        }
     });
 }
 
@@ -4757,10 +4797,15 @@ function loadVpsCronList() {
     });
 }
 
-function loadVpsNetworkList() {
-    populateVpsSelect('networkVpsSelect', (vpsId) => {
+async function loadVpsNetworkList() {
+    await populateVpsSelect('networkVpsSelect', (vpsId) => {
         currentNetworkVpsId = vpsId;
     });
+    // Set currentNetworkVpsId from existing select value (if page reloads with selection)
+    const sel = document.getElementById('networkVpsSelect');
+    if (sel && sel.value) {
+        currentNetworkVpsId = sel.value;
+    }
 }
 
 // ─── TOTP Login Integration ────────────────────────────────
@@ -4797,7 +4842,7 @@ async function verifyTotpLogin() {
         } else {
             const errEl = document.getElementById('totpLoginError');
             if (errEl) {
-                errEl.textContent = r.error || 'Invalid verification code';
+                errEl.textContent = r.message || 'Invalid verification code';
                 errEl.classList.remove('hidden');
             }
         }
