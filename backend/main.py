@@ -1312,7 +1312,7 @@ async def vps_batch_container_count(request: Request):
 
 
 # ─── Version endpoint ──────────────────────────────────────
-VERSION = os.getenv("SERVERSPHERE_VERSION", "v0.1.0")
+VERSION = os.getenv("SERVERSPHERE_VERSION", "v0.3.0")
 
 
 @app.get("/api/version")
