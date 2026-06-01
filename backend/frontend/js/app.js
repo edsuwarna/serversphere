@@ -4663,7 +4663,8 @@ function showTotpSetupModal(data) {
     const codeInput = document.getElementById('totpVerifyCode');
 
     if (qrEl && data.qr_base64) {
-        qrEl.innerHTML = `<img src="data:image/png;base64,${esc(data.qr_base64)}" alt="TOTP QR Code" style="max-width:200px;border-radius:8px;">`;
+        qrEl.src = `data:image/png;base64,${esc(data.qr_base64)}`;
+        qrEl.style.display = '';
     } else if (qrEl) {
         qrEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted)">QR code unavailable</div>';
     }
