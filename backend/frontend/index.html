@@ -175,9 +175,19 @@
                     <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme" id="themeToggleBtn">
                         <span class="material-icons" id="themeIcon">dark_mode</span>
                     </button>
-                    <div class="user-menu" onclick="document.getElementById('userMenuDropdown').classList.toggle('hidden')">
+                    <div class="user-menu" onclick="document.getElementById('userMenuDropdown').classList.toggle('hidden')" style="position:relative;">
                         <div class="user-avatar" id="userAvatarInitials">ES</div>
                         <span id="userDisplay" class="user-name"></span>
+                        <div id="userMenuDropdown" class="hidden" style="position:absolute;top:100%;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:180px;z-index:1000;padding:8px 0;">
+                            <div style="padding:8px 16px;font-size:12px;color:var(--text-muted);" id="userMenuEmail"></div>
+                            <hr style="border:none;border-top:1px solid var(--border);margin:4px 0;">
+                            <div onclick="event.stopPropagation();showPage('settings')" style="padding:8px 16px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;" onmouseover="this.style.background='var(--tertiary)'" onmouseout="this.style.background='transparent'">
+                                <span class="material-icons" style="font-size:16px">settings</span> Settings
+                            </div>
+                            <div onclick="event.stopPropagation();logout()" style="padding:8px 16px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--danger);" onmouseover="this.style.background='var(--tertiary)'" onmouseout="this.style.background='transparent'">
+                                <span class="material-icons" style="font-size:16px">logout</span> Logout
+                            </div>
+                        </div>
                     </div>
                     <button class="btn btn-ghost btn-sm" onclick="logout()">
                         <span class="material-icons" style="font-size:18px">logout</span>
@@ -882,8 +892,8 @@
                     </div>
 
                     <div class="form-group" style="margin-bottom:16px;max-width:320px;">
-                        <label for="composeVPS">VPS Instance</label>
-                        <select id="composeVPS" onchange="onComposeVPSChange()">
+                        <label for="composeVpsSelect">VPS Instance</label>
+                        <select id="composeVpsSelect">
                             <option value="">-- Select VPS --</option>
                         </select>
                     </div>
@@ -894,7 +904,7 @@
                             <span class="material-icons empty-icon" style="font-size:48px;color:var(--text-muted)">layers</span>
                             <p style="color:var(--text-muted);">Select a VPS to view Docker Compose files.</p>
                         </div>
-                        <div id="composeFilesCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">
+                        <div id="composeFilesContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">
                             <!-- Compose file cards rendered dynamically by JS -->
                         </div>
                         <!-- Template for compose file cards -->
@@ -932,26 +942,14 @@
                     </div>
 
                     <!-- Compose Services Table -->
-                    <div class="card" style="padding:0;overflow:hidden;">
+                    <div id="composeServicesContainer" class="card" style="padding:0;overflow:hidden;">
                         <div class="card-header" style="padding:12px 16px;">
                             <span class="material-icons" style="font-size:18px;margin-right:8px">view_in_ar</span>
                             <h3 style="margin:0;font-size:14px;font-weight:600;">Services</h3>
                         </div>
-                        <div class="table-wrapper">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Status</th>
-                                        <th>Image</th>
-                                        <th>Ports</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="composeServicesBody">
-                                    <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px;">Select a VPS and compose file to view services.</td></tr>
-                                </tbody>
-                            </table>
+                        <div class="empty-state" id="composeServicesEmpty">
+                            <span class="material-icons empty-icon" style="font-size:48px;color:var(--text-muted)">view_in_ar</span>
+                            <p style="color:var(--text-muted);">Select a VPS and compose file to view services.</p>
                         </div>
                     </div>
                 </div>
@@ -964,15 +962,15 @@
                             <button class="btn btn-primary" onclick="refreshCronJobs()">
                                 <span class="material-icons" style="font-size:16px">refresh</span> Refresh
                             </button>
-                            <button class="btn btn-primary" onclick="showAddCronJob()">
+                            <button class="btn btn-primary" onclick="showCronEditModal(null)">
                                 <span class="material-icons" style="font-size:18px">add</span> Add Cron Job
                             </button>
                         </div>
                     </div>
 
                     <div class="form-group" style="margin-bottom:16px;max-width:320px;">
-                        <label for="cronVPS">VPS Instance</label>
-                        <select id="cronVPS" onchange="onCronVPSChange()">
+                        <label for="cronVpsSelect">VPS Instance</label>
+                        <select id="cronVpsSelect">
                             <option value="">-- Select VPS --</option>
                         </select>
                     </div>
@@ -1000,7 +998,7 @@
                                     <button class="btn btn-primary" id="crontabEditBtn" onclick="editCrontab()">
                                         <span class="material-icons" style="font-size:16px">edit</span> Edit
                                     </button>
-                                    <button class="btn btn-primary" id="crontabSaveBtn" onclick="saveCrontab()" style="display:none;">
+                                    <button class="btn btn-primary" id="crontabSaveBtn" onclick="saveCrontabFromEditor()" style="display:none;">
                                         <span class="material-icons" style="font-size:16px">save</span> Save
                                     </button>
                                 </div>
@@ -1010,21 +1008,11 @@
 
                     <!-- Stored Jobs Tab -->
                     <div id="cron-tab-stored-jobs" class="tab-content" style="display:none;">
-                        <div class="table-wrapper">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Schedule</th>
-                                        <th>Command</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="storedJobsBody">
-                                    <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px;">No stored jobs. Click "Add Cron Job" to create one.</td></tr>
-                                </tbody>
-                            </table>
+                        <div id="storedCronJobsContainer">
+                            <div class="empty-state">
+                                <span class="material-icons empty-icon" style="font-size:48px;color:var(--text-muted)">storage</span>
+                                <p style="color:var(--text-muted);">No stored jobs. Click "Add Cron Job" to create one.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1036,8 +1024,8 @@
                     </div>
 
                     <div class="form-group" style="margin-bottom:16px;max-width:320px;">
-                        <label for="networkVPS">VPS Instance</label>
-                        <select id="networkVPS" onchange="onNetworkVPSChange()">
+                        <label for="networkVpsSelect">VPS Instance</label>
+                        <select id="networkVpsSelect">
                             <option value="">-- Select VPS --</option>
                         </select>
                     </div>
@@ -1067,10 +1055,10 @@
                                     </select>
                                 </div>
                             </div>
-                            <button class="btn btn-primary" onclick="runPing()">
+                            <button class="btn btn-primary" onclick="runPing(currentNetworkVpsId)">
                                 <span class="material-icons" style="font-size:16px">play_arrow</span> Run Ping
                             </button>
-                            <pre id="pingResults" class="code-block" style="margin-top:12px;max-height:200px;overflow-y:auto;display:none;"></pre>
+                            <pre id="pingResult" class="code-block" style="margin-top:12px;max-height:200px;overflow-y:auto;display:none;"></pre>
                         </div>
                     </div>
 
@@ -1088,10 +1076,10 @@
                                 <label>Target</label>
                                 <input type="text" id="tracerouteTarget" placeholder="google.com or 8.8.8.8">
                             </div>
-                            <button class="btn btn-primary" onclick="runTraceroute()">
+                            <button class="btn btn-primary" onclick="runTraceroute(currentNetworkVpsId)">
                                 <span class="material-icons" style="font-size:16px">play_arrow</span> Run Traceroute
                             </button>
-                            <pre id="tracerouteResults" class="code-block" style="margin-top:12px;max-height:300px;overflow-y:auto;display:none;"></pre>
+                            <pre id="tracerouteResult" class="code-block" style="margin-top:12px;max-height:300px;overflow-y:auto;display:none;"></pre>
                         </div>
                     </div>
 
@@ -1108,7 +1096,7 @@
                             <div class="form-row" style="gap:8px;">
                                 <div class="form-group" style="flex:1;">
                                     <label>Domain</label>
-                                    <input type="text" id="dnsDomain" placeholder="example.com">
+                                    <input type="text" id="dnsHostname" placeholder="example.com">
                                 </div>
                                 <div class="form-group" style="width:140px;">
                                     <label>Record Type</label>
@@ -1121,10 +1109,10 @@
                                     </select>
                                 </div>
                             </div>
-                            <button class="btn btn-primary" onclick="runDnsLookup()">
+                            <button class="btn btn-primary" onclick="runDnsLookup(currentNetworkVpsId)">
                                 <span class="material-icons" style="font-size:16px">play_arrow</span> DNS Lookup
                             </button>
-                            <pre id="dnsResults" class="code-block" style="margin-top:12px;max-height:300px;overflow-y:auto;display:none;"></pre>
+                            <pre id="dnsResult" class="code-block" style="margin-top:12px;max-height:300px;overflow-y:auto;display:none;"></pre>
                         </div>
                     </div>
 
@@ -1141,7 +1129,7 @@
                             <div class="form-row" style="gap:8px;">
                                 <div class="form-group" style="flex:1;">
                                     <label>Target</label>
-                                    <input type="text" id="portCheckTarget" placeholder="example.com or 8.8.8.8">
+                                    <input type="text" id="portCheckHost" placeholder="example.com or 8.8.8.8">
                                 </div>
                                 <div class="form-group" style="width:100px;">
                                     <label>Port</label>
@@ -1155,7 +1143,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <button class="btn btn-primary" onclick="runPortCheck()">
+                            <button class="btn btn-primary" onclick="runPortCheck(currentNetworkVpsId)">
                                 <span class="material-icons" style="font-size:16px">play_arrow</span> Check
                             </button>
                             <div id="portCheckResult" style="margin-top:12px;display:none;padding:12px 16px;border-radius:6px;font-weight:500;"></div>
@@ -1181,10 +1169,10 @@
                                     <span style="font-size:13px;color:var(--text-muted);">Status:</span>
                                     <span id="totpStatus" style="font-weight:600;margin-left:4px;color:var(--text-muted);">Checking...</span>
                                 </div>
-                                <button class="btn btn-primary" id="totpSetupBtn" onclick="setupTOTP()" style="display:none;">
+                                <button class="btn btn-primary" id="totpSetupBtn" onclick="setupTotp()" style="display:none;">
                                     <span class="material-icons" style="font-size:16px">lock</span> Setup TOTP
                                 </button>
-                                <button class="btn btn-danger" id="totpDisableBtn" onclick="disableTOTP()" style="display:none;">
+                                <button class="btn btn-danger" id="totpDisableBtn" onclick="disableTotp()" style="display:none;">
                                     <span class="material-icons" style="font-size:16px">lock_open</span> Disable
                                 </button>
                             </div>
@@ -2128,11 +2116,11 @@
 
     <!-- ═══ TOTP Setup Modal ═══ -->
     <div id="totpSetupModal" class="modal hidden">
-        <div class="modal-backdrop" onclick="closeTOTPModal()"></div>
+        <div class="modal-backdrop" onclick="closeTotpSetupModal()"></div>
         <div class="modal-card" style="max-width:420px;">
             <div class="modal-header">
                 <h3>Setup Two-Factor Authentication</h3>
-                <button class="modal-close" onclick="closeTOTPModal()">
+                <button class="modal-close" onclick="closeTotpSetupModal()">
                     <span class="material-icons">close</span>
                 </button>
             </div>
@@ -2146,15 +2134,15 @@
                     <code id="totpSecret" style="font-size:12px;word-break:break-all;padding:8px;background:var(--tertiary);border-radius:4px;display:inline-block;"></code>
                 </div>
                 <div class="form-group">
-                    <label for="totpCode">Verification Code</label>
-                    <input type="text" id="totpCode" placeholder="Enter 6-digit code" maxlength="6" style="text-align:center;font-size:18px;letter-spacing:4px;font-family:var(--mono);">
+                    <label for="totpVerifyCode">Verification Code</label>
+                    <input type="text" id="totpVerifyCode" placeholder="Enter 6-digit code" maxlength="6" style="text-align:center;font-size:18px;letter-spacing:4px;font-family:var(--mono);">
                 </div>
             </div>
             <div class="modal-footer" style="justify-content:center;">
-                <button type="button" class="btn btn-primary" onclick="verifyTOTP()">
+                <button type="button" class="btn btn-primary" onclick="verifyTotpFromModal()">
                     <span class="material-icons" style="font-size:16px">check_circle</span> Verify
                 </button>
-                <button type="button" class="btn btn-secondary" onclick="closeTOTPModal()">Cancel</button>
+                <button type="button" class="btn btn-secondary" onclick="closeTotpSetupModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -2187,7 +2175,7 @@
         <div class="modal-backdrop" onclick="closeCronEditModal()"></div>
         <div class="modal-card" style="max-width:540px;">
             <div class="modal-header">
-                <h3 id="cronEditModalTitle">Add Cron Job</h3>
+                <h3 id="cronEditTitle">Add Cron Job</h3>
                 <button class="modal-close" onclick="closeCronEditModal()">
                     <span class="material-icons">close</span>
                 </button>
@@ -2217,6 +2205,33 @@
                 <button type="button" class="btn btn-primary" onclick="saveCronJob()">
                     <span class="material-icons" style="font-size:16px">save</span> Save
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ TOTP Login Modal ═══ -->
+    <div id="totpLoginModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeTotpLoginPrompt()"></div>
+        <div class="modal-card" style="max-width:380px;">
+            <div class="modal-header">
+                <h3>Two-Factor Authentication</h3>
+                <button class="modal-close" onclick="closeTotpLoginPrompt()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div style="padding:16px 24px;text-align:center;">
+                <span class="material-icons" style="font-size:48px;color:var(--primary);margin-bottom:12px;">verified_user</span>
+                <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Enter the 6-digit code from your authenticator app.</p>
+                <div class="form-group">
+                    <input type="text" id="totpLoginCode" placeholder="000000" maxlength="6" style="text-align:center;font-size:24px;letter-spacing:8px;font-family:var(--mono);">
+                </div>
+                <div id="totpLoginError" class="hidden" style="color:var(--danger);font-size:12px;margin-top:4px;"></div>
+            </div>
+            <div class="modal-footer" style="justify-content:center;">
+                <button type="button" class="btn btn-primary" onclick="verifyTotpLogin()">
+                    <span class="material-icons" style="font-size:16px">check_circle</span> Verify
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeTotpLoginPrompt()">Cancel</button>
             </div>
         </div>
     </div>

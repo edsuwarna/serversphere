@@ -1225,6 +1225,19 @@ function switchTab(tabName) {
     }
 }
 
+function switchCronTab(tabName) {
+    document.querySelectorAll('#page-cron .tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tabName);
+    });
+    document.querySelectorAll('#page-cron .tab-content').forEach(tc => {
+        tc.style.display = tc.id === `cron-tab-${tabName}` ? '' : 'none';
+    });
+    // Trigger stored jobs load when switching to that tab
+    if (tabName === 'stored-jobs' && currentCronVpsId) {
+        loadStoredCronJobs(currentCronVpsId);
+    }
+}
+
 // ─── Terminal ───────────────────────────────────────────────
 function initTerminal(vpsId) {
     // Legacy single-terminal mode uses null vpsId => uses #terminalContainer
@@ -4230,6 +4243,11 @@ async function loadComposeFiles(vpsId) {
     }
 }
 
+function refreshCompose() {
+    if (!currentComposeVpsId) { showToast('Select a VPS first', 'warning'); return; }
+    loadComposeFiles(currentComposeVpsId);
+}
+
 function renderComposeFiles(files) {
     const container = document.getElementById('composeFilesContainer');
     if (!container) return;
@@ -4348,6 +4366,17 @@ function saveCrontabFromEditor() {
     const editor = document.getElementById('crontabEditor');
     if (!editor || !currentCronVpsId) return;
     saveCrontab(currentCronVpsId, editor.value);
+}
+
+function editCrontab() {
+    const editor = document.getElementById('crontabEditor');
+    const editBtn = document.getElementById('crontabEditBtn');
+    const saveBtn = document.getElementById('crontabSaveBtn');
+    if (!editor || !editBtn || !saveBtn) return;
+    editor.readOnly = false;
+    editor.focus();
+    editBtn.style.display = 'none';
+    saveBtn.style.display = 'inline-flex';
 }
 
 async function loadStoredCronJobs(vpsId) {
