@@ -1,3 +1,210 @@
+/* ═══ ServerSphere - Alpine.js App Component ═══ */
+/* Bridge between Alpine.js templates and vanilla JS logic */
+
+/** Global reference for vanilla JS to read/write Alpine reactive state */
+let __alpine = null;
+
+/**
+ * Alpine.js root component — drives sidebar, dashboard, theme, toasts, search.
+ * Referenced by x-data="alpineApp()" on the #app element.
+ */
+function alpineApp() {
+    return {
+        // ── UI State ──
+        sidebarCollapsed: false,
+        theme: 'dark',
+        activePage: 'dashboard',
+        version: 'v0.3.0',
+        hover: false,
+
+        // ── Auth ──
+        currentUser: null,
+
+        // ── Search ──
+        searchQuery: '',
+        searchResults: [],
+        _allVPS: [],
+
+        // ── Dashboard ──
+        dashboardStats: { total: '-', online: '-', offline: '-', containers: '-' },
+        dashboardVPS: [],
+        dashboardFilter: { query: '', status: 'all', group: 'all', groups: [] },
+
+        // ── Toasts ──
+        toasts: [],
+        _toastId: 0,
+
+        // ── Page titles ──
+        pageTitles: {
+            'dashboard': 'Overview',
+            'vps-list': 'Instances',
+            'vps-detail': 'VPS Detail',
+            'users': 'User Management',
+            'audit': 'Audit Logs',
+            'permissions': 'Role Permissions',
+            'ssh-keys': 'SSH Keys',
+            'groups': 'Groups',
+            'github': 'GitHub Actions',
+            'scripts': 'Script Library',
+            'compose': 'Docker Compose',
+            'cron': 'Cron Jobs',
+            'network': 'Network Tools',
+            'settings': 'Settings',
+        },
+
+        // ── Init ──
+        init() {
+            __alpine = this;
+            // Read saved theme
+            try {
+                const saved = localStorage.getItem('serversphere-theme');
+                if (saved) this.theme = saved;
+            } catch {}
+            this.applyTheme();
+        },
+
+        // ── Theme ──
+        toggleTheme() {
+            this.theme = this.theme === 'dark' ? 'light' : 'dark';
+            try { localStorage.setItem('serversphere-theme', this.theme); } catch {}
+            this.applyTheme();
+        },
+        applyTheme() {
+            document.documentElement.setAttribute('data-theme', this.theme);
+        },
+
+        // ── Navigation ──
+        navigate(page) {
+            // Restrict non-admin pages
+            if (!this.isAdmin && ['users','audit','permissions','ssh-keys','groups','github'].includes(page)) {
+                page = 'dashboard';
+            }
+            this.activePage = page;
+            // Call existing vanilla page loader
+            const loaders = {
+                'dashboard': () => { refreshDashboard(); },
+                'vps-list': () => { clearSelection(); loadVPSList(); },
+                'users': () => loadUsersList(),
+                'audit': () => loadAuditLogs(),
+                'ssh-keys': () => loadSSHKeys(),
+                'groups': () => loadGroups(),
+                'github': () => loadGitHubActions(),
+                'scripts': () => { loadScripts(); loadScriptRuns(); },
+                'compose': () => loadVpsComposeList(),
+                'cron': () => loadVpsCronList(),
+                'network': () => loadVpsNetworkList(),
+                'settings': () => loadSettings(),
+            };
+            if (loaders[page]) loaders[page]();
+
+            // Close mobile sidebar
+            const overlay = document.querySelector('.sidebar-overlay');
+            if (overlay && !overlay.classList.contains('hidden')) {
+                overlay.classList.add('hidden');
+            }
+        },
+
+        // ── Auth helpers ──
+        get isAdmin() {
+            return this.currentUser && this.currentUser.role === 'admin';
+        },
+        get isOperator() {
+            return this.currentUser && (this.currentUser.role === 'operator' || this.currentUser.role === 'admin');
+        },
+
+        // ── Dashboard ──
+        refreshDashboard() {
+            refreshDashboard();
+        },
+
+        // ── Search ──
+        handleSearchInput() {
+            const q = this.searchQuery.toLowerCase().trim();
+            if (q.length < 2) { this.searchResults = []; return; }
+            this.searchResults = this._allVPS.filter(v =>
+                v.name.toLowerCase().includes(q) ||
+                v.host.toLowerCase().includes(q)
+            ).slice(0, 8);
+        },
+        navigateToVPS(id) {
+            this.searchQuery = '';
+            this.searchResults = [];
+            showVPSDetail(id);
+        },
+
+        // ── Filtered VPS (computed for dashboard) ──
+        get filteredVPS() {
+            let list = [...this.dashboardVPS];
+            const f = this.dashboardFilter;
+
+            // Text filter
+            if (f.query.trim()) {
+                const q = f.query.toLowerCase();
+                list = list.filter(v =>
+                    v.name.toLowerCase().includes(q) ||
+                    v.host.toLowerCase().includes(q) ||
+                    (v.tags && v.tags.some(t => t.toLowerCase().includes(q)))
+                );
+            }
+
+            // Status filter
+            if (f.status === 'online') list = list.filter(v => v.online);
+            else if (f.status === 'offline') list = list.filter(v => !v.online);
+
+            // Group filter
+            if (f.group && f.group !== 'all') {
+                list = list.filter(v => v.group === f.group || (!v.group && f.group === 'default'));
+            }
+
+            return list;
+        },
+
+        // ── Resource bar color ──
+        resourceColor(pct) {
+            if (pct === undefined || pct === null) return 'var(--text-muted)';
+            const n = parseFloat(pct);
+            if (n > 80) return 'var(--danger)';
+            if (n > 60) return 'var(--warning)';
+            return 'var(--success)';
+        },
+
+        // ── Toasts ──
+        showToast(message, type = 'success') {
+            const icons = { success: 'check_circle', error: 'error', warning: 'warning', info: 'info' };
+            const colors = { success: 'var(--success)', error: 'var(--danger)', warning: 'var(--warning)', info: 'var(--info)' };
+            const id = ++this._toastId;
+            this.toasts.push({
+                id,
+                message,
+                icon: icons[type] || 'info',
+                color: colors[type] || 'var(--text-muted)',
+                visible: true,
+            });
+            setTimeout(() => this.removeToast(id), 4000);
+        },
+        removeToast(id) {
+            const t = this.toasts.find(t => t.id === id);
+            if (t) t.visible = false;
+            setTimeout(() => { this.toasts = this.toasts.filter(t => t.id !== id); }, 300);
+        },
+
+        // ── Modals ──
+        showAddVPSModal() {
+            if (typeof showAddVPSModal === 'function') showAddVPSModal();
+            else window.showAddVPSModal && window.showAddVPSModal();
+        },
+        showVPSDetail(id) {
+            if (typeof showVPSDetail === 'function') showVPSDetail(id);
+        },
+        logout() {
+            if (typeof logout === 'function') logout();
+        },
+    };
+}
+
+/* ═══ End Alpine.js Component ═══ */
+
+
 /* ═══ ServerSphere - Application Logic ═══ */
 
 // ─── State ──────────────────────────────────────────────────
@@ -100,6 +307,10 @@ async function checkAuth() {
             const avatarEl = document.getElementById('userAvatarInitials');
             if (avatarEl) avatarEl.textContent = initials;
             await fetchCurrentUser();  // get full info including vps_access
+            // Sync user to Alpine
+            if (__alpine) {
+                __alpine.currentUser = currentUser;
+            }
             applyPermissions();
             showApp();
             return;
@@ -161,6 +372,8 @@ function showLogin() {
     document.getElementById('loginScreen').classList.remove('hidden');
     document.getElementById('app').classList.add('hidden');
     currentUser = null;
+    // Clear Alpine user state
+    if (__alpine) __alpine.currentUser = null;
     checkOidcConfig();
 }
 
@@ -311,6 +524,8 @@ function showPage(page) {
     if (page === 'cron') loadVpsCronList();
     if (page === 'network') loadVpsNetworkList();
     if (page === 'settings') loadSettings();
+    // Sync Alpine active page
+    if (__alpine) __alpine.activePage = page;
 }
 
 // ─── Collapsible Cards ──────────────────────────────────────
@@ -366,48 +581,28 @@ async function refreshDashboard() {
         }
         document.getElementById('totalContainers').textContent = totalContainers;
 
-        // Render cards
-        const grid = document.getElementById('dashboardGrid');
-        if (vpsList.length === 0) {
-            if (isAdmin()) {
-                grid.innerHTML = `<div class="empty-state"><div class="empty-icon">🖥️</div>
-                    <p>No VPS added yet. <a href="#" onclick="showAddVPSModal()">Add your first VPS</a></p></div>`;
-            } else {
-                grid.innerHTML = `<div class="empty-state"><div class="empty-icon">🖥️</div>
-                    <p>No VPS available.</p></div>`;
-            }
-            return;
+        // Update Alpine dashboard data
+        if (__alpine) {
+            __alpine.dashboardStats = {
+                total: vpsList.length,
+                online,
+                offline,
+                containers: totalContainers,
+            };
+            // Deep clone for Alpine reactivity
+            __alpine.dashboardVPS = vpsList.map(v => ({
+                ...v,
+                _resources: null,
+                tags: v.tags || [],
+                group: v.group || '',
+            }));
+            __alpine._allVPS = vpsList;
+            // Extract unique groups for filter
+            const groups = [...new Set(vpsList.map(v => v.group || 'default').filter(Boolean))];
+            __alpine.dashboardFilter.groups = groups;
         }
 
-        let html = '';
-        for (const v of vpsList) {
-            const onlineBadge = v.online
-                ? `<span class="vps-badge online">🟢 Online</span>`
-                : `<span class="vps-badge offline">🔴 Offline</span>`;
-            html += `<div class="vps-card ${v.online ? 'vps-card-online' : ''}" onclick="showVPSDetail('${v.id}')">
-                <div class="vps-card-header">
-                    <div class="vps-card-name">
-                        <span class="status-dot ${v.online ? 'online' : 'offline'}"></span>
-                        ${esc(v.name)}
-                    </div>
-                    <div style="display:flex;align-items:center;gap:6px;">
-                        ${onlineBadge}
-                        ${v.group ? `<span class="vps-group-tag">${esc(v.group)}</span>` : ''}
-                    </div>
-                </div>
-                <div class="vps-card-host">
-                    <span class="material-icons" style="font-size:14px;vertical-align:middle;color:var(--text-muted)">dns</span>
-                    ${esc(v.host)}:${v.port} · ${esc(v.username)}
-                </div>
-                <div class="vps-card-resources" id="vps-res-${v.id}">
-                    <div class="resource-item-placeholder">Loading resources...</div>
-                </div>
-                ${v.tags && v.tags.length ? `<div class="vps-card-tags">${v.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
-            </div>`;
-        }
-        grid.innerHTML = html;
-
-        // Load resource previews for online VPS
+        // Load resource previews for online VPS (updates Alpine data)
         for (const v of vpsList.filter(v => v.online)) {
             loadCardResources(v.id);
         }
@@ -424,6 +619,7 @@ async function loadCardResources(vpsId) {
         if (!resEl || r.error) return;
 
         let resHtml = '';
+        let resData = {};
         if (r.cpu_percent !== undefined && r.cpu_percent !== 'N/A') {
             const pct = parseFloat(r.cpu_percent);
             const color = pct > 80 ? 'var(--danger)' : pct > 60 ? 'var(--warning)' : 'var(--success)';
@@ -432,6 +628,7 @@ async function loadCardResources(vpsId) {
                 <span style="font-weight:600;color:${color}">${pct}%</span>
                 <div class="resource-bar"><div class="resource-bar-fill" style="width:${pct}%;background:${color}"></div></div>
             </div>`;
+            resData.cpu = pct;
         }
         if (r.memory && r.memory.percent) {
             const pct = parseFloat(r.memory.percent);
@@ -444,6 +641,7 @@ async function loadCardResources(vpsId) {
                 <span style="font-size:11px;color:var(--text-muted)">${used} / ${total}</span>
                 <div class="resource-bar"><div class="resource-bar-fill" style="width:${pct}%;background:${color}"></div></div>
             </div>`;
+            resData.ram = { percent: pct, used, total };
         }
         if (r.disk && r.disk.percent) {
             const pct = parseInt(r.disk.percent);
@@ -454,8 +652,17 @@ async function loadCardResources(vpsId) {
                 <span style="font-size:11px;color:var(--text-muted)">${r.disk.used || '?'} / ${r.disk.total || '?'}</span>
                 <div class="resource-bar"><div class="resource-bar-fill" style="width:${pct}%;background:${color}"></div></div>
             </div>`;
+            resData.disk = { percent: pct, used: r.disk.used || '?', total: r.disk.total || '?' };
         }
         resEl.innerHTML = resHtml || '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:4px">No resource data</div>';
+        // Update Alpine data
+        if (__alpine && Object.keys(resData).length > 0) {
+            const vpsIdx = __alpine.dashboardVPS.findIndex(v => v.id === vpsId);
+            if (vpsIdx >= 0) {
+                __alpine.dashboardVPS[vpsIdx]._resources = resData;
+                __alpine.dashboardVPS = [...__alpine.dashboardVPS];
+            }
+        }
     } catch {}
 }
 
