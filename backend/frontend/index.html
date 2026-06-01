@@ -175,6 +175,12 @@
 
         <!-- Main Panel -->
         <div class="main-panel">
+            <!-- Global Loading Bar -->
+            <div x-show="loading" x-cloak style="position:fixed;top:0;left:0;right:0;z-index:99999;height:3px;background:var(--bg);overflow:hidden;">
+                <div style="height:100%;width:30%;background:linear-gradient(90deg,var(--primary),var(--amber-400));border-radius:0 3px 3px 0;animation:loadingSlide 1.2s ease-in-out infinite;"></div>
+            </div>
+            <style>@keyframes loadingSlide{0%{transform:translateX(-100%)}50%{transform:translateX(200%)}100%{transform:translateX(400%)}}</style>
+
             <!-- Top Bar -->
             <header class="topbar">
                 <div class="topbar-left">
@@ -186,7 +192,7 @@
                 <div class="topbar-center">
                     <div class="search-bar" x-data="{ searchFocused: false }">
                         <span class="material-icons">search</span>
-                        <input type="text" placeholder="Search instances..." id="globalSearch"
+                        <input type="text" placeholder="Search instances... (Ctrl+K)" id="globalSearch"
                             x-model="searchQuery"
                             x-on:focus="searchFocused = true"
                             x-on:blur="setTimeout(() => searchFocused = false, 200)"
@@ -248,9 +254,15 @@
                 <div id="page-dashboard" class="page" x-show="activePage === 'dashboard'">
                     <div class="page-header">
                         <h2>Dashboard</h2>
-                        <button class="btn btn-primary" x-on:click="refreshDashboard()">
-                            <span class="material-icons" style="font-size:16px">refresh</span> Refresh
-                        </button>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <button class="btn btn-sm" :class="autoRefresh ? 'btn-primary' : 'btn-ghost'" @click.prevent="toggleAutoRefresh()" :title="autoRefresh ? 'Auto-refresh ON (30s)' : 'Enable auto-refresh'">
+                                <span class="material-icons" style="font-size:16px" x-text="autoRefresh ? 'sync' : 'sync_disabled'"></span>
+                                <span x-text="autoRefresh ? 'Auto' : 'Manual'" style="font-size:12px"></span>
+                            </button>
+                            <button class="btn btn-primary" @click.prevent="refreshDashboard()">
+                                <span class="material-icons" style="font-size:16px">refresh</span> Refresh
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Stats Row -->
@@ -381,41 +393,114 @@
                                         <span class="tag" x-text="tag"></span>
                                     </template>
                                 </div>
+                                <!-- Quick Actions -->
+                                <div class="vps-card-actions" style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">
+                                    <button class="btn btn-xs" @click.stop.prevent="runQuickAction(v.id, 'uptime')" title="Uptime" style="padding:2px 6px;font-size:10px;">⏱</button>
+                                    <button class="btn btn-xs" @click.stop.prevent="runQuickAction(v.id, 'df -h /')" title="Disk" style="padding:2px 6px;font-size:10px;">💾</button>
+                                    <button class="btn btn-xs" @click.stop.prevent="runQuickAction(v.id, 'free -h')" title="Memory" style="padding:2px 6px;font-size:10px;">🧠</button>
+                                </div>
                             </div>
                         </template>
                     </div>
                 </div>
 
-                <!-- ═══ VPS List Page ═══ -->
+                <!-- ═══ VPS List Page (Alpine) ═══ -->
                 <div id="page-vps-list" class="page" x-show="activePage === 'vps-list'">
                     <div class="page-header">
                         <h2>Instances</h2>
-                        <button id="addVPSBtn" class="btn btn-primary" onclick="showAddVPSModal()">
-                            <span class="material-icons" style="font-size:18px">add</span> Add Instance
-                        </button>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <div class="relative" style="position:relative;min-width:180px;">
+                                <span class="material-icons" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--text-muted);">search</span>
+                                <input type="text" x-model="vpsListFilter.query" placeholder="Filter instances..."
+                                    style="width:100%;padding:7px 10px 7px 32px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:13px;outline:none;">
+                            </div>
+                            <span style="font-size:12px;color:var(--text-muted);" x-text="filteredVPSList.length + ' of ' + vpsListData.length"></span>
+                            <button class="btn btn-primary" @click.prevent="showAddVPSModal()">
+                                <span class="material-icons" style="font-size:18px">add</span> Add Instance
+                            </button>
+                        </div>
                     </div>
-                    <div class="vps-card-grid" id="vpsCardGrid">
+
+                    <!-- Empty state -->
+                    <div x-show="filteredVPSList.length === 0" class="empty-state">
+                        <span class="material-icons empty-icon" style="font-size:48px;color:var(--text-muted);">dns</span>
+                        <p style="color:var(--text-muted);">No VPS instances found.</p>
+                    </div>
+
+                    <!-- VPS Cards Grid -->
+                    <div class="vps-card-grid" x-show="filteredVPSList.length > 0">
+                        <template x-for="v in filteredVPSList" :key="v.id">
+                            <div class="vps-card" :class="v.online ? 'online' : 'offline'">
+                                <div class="vps-card-header">
+                                    <div class="vps-card-status">
+                                        <span class="status-dot" :class="v.online ? 'online' : 'offline'"></span>
+                                        <span class="vps-card-name" x-text="v.name"></span>
+                                        <span class="status-label" :class="v.online ? 'online' : 'offline'" x-text="v.online ? '🟢 Online' : '🔴 Offline'"></span>
+                                    </div>
+                                    <div class="vps-card-check">
+                                        <input type="checkbox" class="vps-checkbox" :value="v.id" :checked="vpsListSelected.has(v.id)" @change="toggleVPSListSelect(v.id)">
+                                    </div>
+                                </div>
+                                <div class="vps-card-body">
+                                    <div class="vps-card-info">
+                                        <div class="vps-card-row">
+                                            <span class="material-icons card-row-icon">computer</span>
+                                            <code x-text="v.host + ':' + v.port"></code>
+                                        </div>
+                                        <div class="vps-card-row">
+                                            <span class="material-icons card-row-icon">person</span>
+                                            <span x-text="v.username"></span>
+                                        </div>
+                                        <div class="vps-card-row" x-show="v.group && v.group !== 'default'">
+                                            <span class="material-icons card-row-icon">folder</span>
+                                            <span class="tag" x-text="v.group"></span>
+                                        </div>
+                                        <div class="vps-card-row vps-card-tags" x-show="v.tags && v.tags.length">
+                                            <span class="material-icons card-row-icon">label</span>
+                                            <template x-for="tag in v.tags" :key="tag">
+                                                <span class="tag" x-text="tag"></span>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="vps-card-actions">
+                                    <button class="btn btn-sm btn-primary" @click.prevent="navigateToVPSDetail(v.id)">
+                                        <span class="material-icons" style="font-size:16px">open_in_new</span> Open
+                                    </button>
+                                    <template x-if="isAdmin">
+                                        <button class="btn btn-sm" @click.prevent="editVPS(v.id)">
+                                            <span class="material-icons" style="font-size:16px">edit</span> Edit
+                                        </button>
+                                    </template>
+                                    <template x-if="isAdmin">
+                                        <button class="btn btn-sm btn-danger" @click.prevent="deleteVPS(v.id, v.name)">
+                                            <span class="material-icons" style="font-size:16px">delete</span> Delete
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
                     </div>
 
                     <!-- Bulk Action Bar -->
-                    <div id="bulkActionBar" class="bulk-action-bar hidden">
+                    <div class="bulk-action-bar" x-show="vpsListSelected.size > 0" x-cloak>
                         <div class="bulk-bar-inner">
-                            <span id="selectedCount" class="bulk-count">0 selected</span>
+                            <span class="bulk-count" x-text="vpsListSelected.size + ' selected'"></span>
                             <div class="bulk-actions">
-                                <button class="btn btn-primary btn-sm" onclick="showBulkCommandModal()">
+                                <button class="btn btn-primary btn-sm" @click.prevent="showBulkCommandModalAlpine()">
                                     <span class="material-icons" style="font-size:16px">terminal</span> Run Command
                                 </button>
-                                <button class="btn btn-danger btn-sm" onclick="bulkDeleteVPS()" id="bulkDeleteBtn">
+                                <button class="btn btn-danger btn-sm" x-show="isAdmin" @click.prevent="bulkDeleteVPS()">
                                     <span class="material-icons" style="font-size:16px">delete</span> Delete
                                 </button>
                                 <div class="bulk-quick-actions">
-                                    <button class="btn btn-sm" onclick="bulkQuickAction('ping -c 3 google.com')" title="Ping test">📡 Ping</button>
-                                    <button class="btn btn-sm" onclick="bulkQuickAction('uptime')" title="System uptime">⏱ Uptime</button>
-                                    <button class="btn btn-sm" onclick='bulkQuickAction(`docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"`)' title="Docker containers">🐳 Docker PS</button>
-                                    <button class="btn btn-sm" onclick="bulkQuickAction('df -h /')" title="Disk usage">💾 Disk</button>
-                                    <button class="btn btn-sm" onclick="bulkQuickAction('free -h')" title="Memory usage">🧠 Memory</button>
+                                    <button class="btn btn-sm" @click.prevent="bulkQuickAction('ping -c 3 google.com')" title="Ping test">📡 Ping</button>
+                                    <button class="btn btn-sm" @click.prevent="bulkQuickAction('uptime')" title="System uptime">⏱ Uptime</button>
+                                    <button class="btn btn-sm" @click.prevent='bulkQuickAction(`docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"`)' title="Docker containers">🐳 Docker PS</button>
+                                    <button class="btn btn-sm" @click.prevent="bulkQuickAction('df -h /')" title="Disk usage">💾 Disk</button>
+                                    <button class="btn btn-sm" @click.prevent="bulkQuickAction('free -h')" title="Memory usage">🧠 Memory</button>
                                 </div>
-                                <button class="btn btn-ghost btn-sm" onclick="clearSelection()">
+                                <button class="btn btn-ghost btn-sm" @click.prevent="clearVPSListSelection()">
                                     <span class="material-icons" style="font-size:16px">close</span> Clear
                                 </button>
                             </div>
@@ -450,7 +535,45 @@
                                     <th>Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="usersTableBody">
+                            <tbody>
+                                <tr x-show="usersData.length === 0">
+                                    <td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">No users found.</td>
+                                </tr>
+                                <template x-for="u in usersData" :key="u.id">
+                                    <tr>
+                                        <td><strong x-text="u.username"></strong></td>
+                                        <td x-text="u.display_name || ''"></td>
+                                        <td><span class="tag" x-text="u.role"></span></td>
+                                        <td>
+                                            <template x-for="n in (u.group_names || [])" :key="n">
+                                                <span style="display:inline-flex;align-items:center;gap:2px;padding:2px 6px;border-radius:3px;background:var(--warning);color:#000;font-size:10px;font-weight:600;margin:1px;">
+                                                    <span class="material-icons" style="font-size:10px">folder</span>
+                                                    <span x-text="n"></span>
+                                                </span>
+                                            </template>
+                                            <span x-show="!u.group_names || u.group_names.length === 0" style="color:var(--text-muted);font-size:12px;">—</span>
+                                        </td>
+                                        <td>
+                                            <span x-show="u.role === 'admin'" style="color:var(--primary)">Full Access</span>
+                                            <span x-show="u.role !== 'admin' && u.vps_access && u.vps_access.length > 0">
+                                                <template x-for="id in u.vps_access" :key="id">
+                                                    <span class="tag" x-text="id"></span>
+                                                </template>
+                                            </span>
+                                            <span x-show="u.role !== 'admin' && (!u.vps_access || u.vps_access.length === 0)" style="color:var(--text-muted)">None</span>
+                                        </td>
+                                        <td><span x-show="u.active !== false" style="color:var(--success)">Active</span><span x-show="u.active === false" style="color:var(--danger)">Disabled</span></td>
+                                        <td><span x-show="u.totp_enabled" style="color:var(--success)">🔐 Enabled</span><span x-show="!u.totp_enabled" style="color:var(--text-muted)">—</span></td>
+                                        <td class="action-btns">
+                                            <button class="btn btn-xs" x-on:click.prevent="showEditUserModal(u.id)">Edit</button>
+                                            <button class="btn btn-xs" x-on:click.prevent="showUserVPSAccessModal(u.id)" title="VPS Access">VPS Access</button>
+                                            <button class="btn btn-xs" x-on:click.prevent="showGroupAccessModal(u.id, u.username)" title="Group Access">
+                                                <span class="material-icons" style="font-size:14px">folder</span>
+                                            </button>
+                                            <button x-show="u.username !== 'admin'" class="btn btn-xs btn-danger" x-on:click.prevent="deleteUser(u.id, u.username)">Delete</button>
+                                        </td>
+                                    </tr>
+                                </template>
                             </tbody>
                         </table>
                     </div>
@@ -506,14 +629,14 @@
                         </select>
                         <input type="text" id="auditUserFilter" placeholder="Filter by user..." oninput="debounceAuditFilter()"
                             style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:13px;width:200px;">
-                        <span id="auditTotalCount" style="font-size:12px;color:var(--text-muted);"></span>
+                        <span id="auditTotalCount" style="font-size:12px;color:var(--text-muted);" x-text="auditTotal + ' log entries'"></span>
                     </div>
                     <div class="audit-pagination" style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
-                        <button class="btn btn-xs" id="auditPrevBtn" onclick="prevAuditPage()" style="display:none">
+                        <button class="btn btn-xs" id="auditPrevBtn" onclick="prevAuditPage()" x-show="auditPage > 1">
                             <span class="material-icons" style="font-size:14px">chevron_left</span> Previous
                         </button>
-                        <span id="auditPageInfo" style="font-size:12px;color:var(--text-muted);"></span>
-                        <button class="btn btn-xs" id="auditNextBtn" onclick="nextAuditPage()">
+                        <span id="auditPageInfo" style="font-size:12px;color:var(--text-muted);" x-text="'Page ' + auditPage + ' of ' + Math.ceil(auditTotal / 50) + ' (' + auditData.length + ' shown)'"></span>
+                        <button class="btn btn-xs" id="auditNextBtn" onclick="nextAuditPage()" x-show="auditPage * 50 < auditTotal">
                             Next <span class="material-icons" style="font-size:14px">chevron_right</span>
                         </button>
                     </div>
@@ -529,7 +652,20 @@
                                     <th>IP</th>
                                 </tr>
                             </thead>
-                            <tbody id="auditTableBody">
+                            <tbody>
+                                <tr x-show="auditData.length === 0">
+                                    <td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted)">No audit logs found.</td>
+                                </tr>
+                                <template x-for="log in auditData" :key="log.id || log.timestamp">
+                                    <tr>
+                                        <td style="white-space:nowrap;font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace" x-text="log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'"></td>
+                                        <td><strong x-text="log.username"></strong></td>
+                                        <td x-text="formatAuditActionLabel(log.action)"></td>
+                                        <td x-text="log.resource_type ? (log.resource_type + (log.resource_name ? ': ' + log.resource_name : (log.resource_id ? ': ' + log.resource_id.substring(0, 8) : ''))) : '-'"></td>
+                                        <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;font-size:12px;color:var(--primary)" x-on:click.prevent="showAuditDetailAlpine(log)" x-text="log.details ? Object.entries(log.details).map(([k,v]) => k + ': ' + v).join(' · ') : ''"></td>
+                                        <td style="font-size:12px;color:var(--text-muted)" x-text="log.ip_address || '-'"></td>
+                                    </tr>
+                                </template>
                             </tbody>
                         </table>
                     </div>
@@ -583,7 +719,45 @@
                     <div class="table-wrapper">
                         <table class="data-table">
                             <thead><tr><th>Name</th><th>Key File Path</th><th>Public Key</th><th>Fingerprint</th><th>Added</th><th>Actions</th></tr></thead>
-                            <tbody id="sshKeysTableBody"></tbody>
+                            <tbody>
+                                <tr x-show="sshKeysData.length === 0">
+                                    <td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px;">No SSH keys added yet. <a href="#" onclick="showAddSSHKeyModal()">Add your first key</a></td>
+                                </tr>
+                                <template x-for="k in sshKeysData" :key="k.id">
+                                    <tr>
+                                        <td>
+                                            <div style="display:flex;align-items:center;gap:8px;">
+                                                <span class="material-icons" style="font-size:18px;color:var(--primary)">vpn_key</span>
+                                                <div>
+                                                    <strong x-text="k.name"></strong>
+                                                    <div style="margin-top:2px;">
+                                                        <span x-show="k.key_type === 'file'" style="font-size:10px;padding:1px 6px;border-radius:3px;background:var(--primary);color:white;">File</span>
+                                                        <span x-show="k.key_type === 'pasted'" style="font-size:10px;padding:1px 6px;border-radius:3px;background:var(--success);color:white;">Pasted</span>
+                                                        <span x-show="k.key_type === 'public_only'" style="font-size:10px;padding:1px 6px;border-radius:3px;background:var(--tertiary);color:var(--text);border:1px solid var(--border);">Public</span>
+                                                        <span x-show="k.key_type === 'both'" style="font-size:10px;padding:1px 6px;border-radius:3px;background:var(--warning);color:white;">Both</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td><code style="font-size:12px;" x-text="k.key_file || '—'"></code></td>
+                                        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                            <code style="font-size:11px;color:var(--text-muted);" x-text="k.public_key || '—'"></code>
+                                        </td>
+                                        <td style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);" x-text="k.fingerprint || '—'"></td>
+                                        <td style="font-size:12px;color:var(--text-muted);" x-text="k.created_at ? new Date(k.created_at * 1000).toLocaleDateString() : ''"></td>
+                                        <td>
+                                            <div style="display:flex;gap:4px;">
+                                                <button class="btn btn-xs" x-on:click.prevent="fetchKeyFingerprint(k.id)" title="Get Fingerprint">
+                                                    <span class="material-icons" style="font-size:14px">fingerprint</span>
+                                                </button>
+                                                <button class="btn btn-xs" x-on:click.prevent="deleteSSHKey(k.id, k.name)" title="Delete">
+                                                    <span class="material-icons" style="font-size:14px;color:var(--danger)">delete</span>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -600,7 +774,53 @@
                     <div class="table-wrapper">
                         <table class="data-table">
                             <thead><tr><th>Name</th><th>Description</th><th>VPS</th><th>Members</th><th>Actions</th></tr></thead>
-                            <tbody id="groupsTableBody"></tbody>
+                            <tbody>
+                                <tr x-show="groupsData.length === 0">
+                                    <td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px;">No groups yet. <a href="#" onclick="showCreateGroupModal()">Create your first group</a></td>
+                                </tr>
+                                <template x-for="g in groupsData" :key="g.id">
+                                    <tr>
+                                        <td>
+                                            <div style="display:flex;align-items:center;gap:8px;">
+                                                <span class="material-icons" style="font-size:18px;color:var(--warning)">folder</span>
+                                                <strong x-text="g.name"></strong>
+                                            </div>
+                                        </td>
+                                        <td style="color:var(--text-muted);font-size:13px;" x-text="g.description || '—'"></td>
+                                        <td>
+                                            <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;background:var(--primary);color:white;font-size:12px;font-weight:500;">
+                                                <span class="material-icons" style="font-size:13px">dns</span>
+                                                <span x-text="g.vps_count"></span>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;background:var(--tertiary);color:var(--text);font-size:12px;">
+                                                <span class="material-icons" style="font-size:13px">people</span>
+                                                <span x-text="g.member_count"></span>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div style="display:flex;gap:4px;">
+                                                <button class="btn btn-xs btn-primary" x-on:click.prevent="showAddVPSToGroup(g.id, g.name)" title="Add VPS">
+                                                    <span class="material-icons" style="font-size:14px">add</span>
+                                                </button>
+                                                <button class="btn btn-xs" x-on:click.prevent="showRemoveVPSFromGroup(g.id, g.name)" title="Remove VPS" :disabled="g.vps_count === 0" :style="g.vps_count === 0 ? 'opacity:0.4;cursor:not-allowed;' : ''">
+                                                    <span class="material-icons" style="font-size:14px;color:var(--warning)">remove</span>
+                                                </button>
+                                                <button class="btn btn-xs" x-on:click.prevent="viewGroupDetail(g.id)" title="View Details">
+                                                    <span class="material-icons" style="font-size:14px">visibility</span>
+                                                </button>
+                                                <button class="btn btn-xs" x-on:click.prevent="editGroup(g.id)" title="Edit">
+                                                    <span class="material-icons" style="font-size:14px">edit</span>
+                                                </button>
+                                                <button class="btn btn-xs" x-on:click.prevent="deleteGroup(g.id, g.name)" title="Delete">
+                                                    <span class="material-icons" style="font-size:14px;color:var(--danger)">delete</span>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -612,10 +832,10 @@
                         <button class="btn btn-primary" onclick="refreshGitHubActions()"><span class="material-icons" style="font-size:16px">sync</span> Refresh</button>
                     </div>
                     <div class="stats-row">
-                        <div class="stat-card" style="border-left:3px solid var(--primary);"><div class="stat-value" id="ghTotalRepos">0</div><div class="stat-label">Total Repos</div></div>
-                        <div class="stat-card" style="border-left:3px solid #22C55E;"><div class="stat-value" id="ghSuccessCount" style="color:#22C55E;">0</div><div class="stat-label">Success</div></div>
-                        <div class="stat-card" style="border-left:3px solid #EF4444;"><div class="stat-value" id="ghFailedCount" style="color:#EF4444;">0</div><div class="stat-label">Failed</div></div>
-                        <div class="stat-card" style="border-left:3px solid #F59E0B;"><div class="stat-value" id="ghRunningCount" style="color:#F59E0B;">0</div><div class="stat-label">Running</div></div>
+                        <div class="stat-card" style="border-left:3px solid var(--primary);"><div class="stat-value" x-text="githubStats.totalRepos">0</div><div class="stat-label">Total Repos</div></div>
+                        <div class="stat-card" style="border-left:3px solid #22C55E;"><div class="stat-value" style="color:#22C55E;" x-text="githubStats.successCount">0</div><div class="stat-label">Success</div></div>
+                        <div class="stat-card" style="border-left:3px solid #EF4444;"><div class="stat-value" style="color:#EF4444;" x-text="githubStats.failedCount">0</div><div class="stat-label">Failed</div></div>
+                        <div class="stat-card" style="border-left:3px solid #F59E0B;"><div class="stat-value" style="color:#F59E0B;" x-text="githubStats.runningCount">0</div><div class="stat-label">Running</div></div>
                     </div>
                     <div style="background:var(--bg-card);border-radius:8px;border:1px solid var(--border);margin-bottom:16px;">
                         <div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleGitHubConfig()">
@@ -625,81 +845,357 @@
                         <div id="ghConfigPanel" style="display:none;padding:0 16px 16px;">
                             <div style="margin-bottom:16px;">
                                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><h4 style="margin:0;display:flex;align-items:center;gap:6px;"><span class="material-icons" style="font-size:16px;">token</span> GitHub Tokens</h4><button class="btn btn-xs btn-primary" onclick="showAddTokenModal()"><span class="material-icons" style="font-size:14px;">add</span> Add Token</button></div>
-                                <div class="table-wrapper"><table class="data-table"><thead><tr><th>Name</th><th>Token</th><th>GitHub User</th><th>Actions</th></tr></thead><tbody id="ghTokensTableBody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px;">No tokens added</td></tr></tbody></table></div>
+                                <div class="table-wrapper">
+                                    <table class="data-table">
+                                        <thead><tr><th>Name</th><th>Token</th><th>GitHub User</th><th>Actions</th></tr></thead>
+                                        <tbody>
+                                            <tr x-show="githubTokens.length === 0">
+                                                <td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px;">No tokens added</td>
+                                            </tr>
+                                            <template x-for="t in githubTokens" :key="t.id">
+                                                <tr>
+                                                    <td><strong x-text="t.name"></strong></td>
+                                                    <td><code style="font-family:'JetBrains Mono',monospace;font-size:12px;" x-text="t.token_masked"></code></td>
+                                                    <td x-text="t.github_user || '-'"></td>
+                                                    <td class="action-btns">
+                                                        <button class="btn btn-xs" x-on:click.prevent="testToken(t.id)" title="Test token">
+                                                            <span class="material-icons" style="font-size:14px;">check_circle</span>
+                                                        </button>
+                                                        <button class="btn btn-xs btn-danger" x-on:click.prevent="deleteToken(t.id, t.name)">
+                                                            <span class="material-icons" style="font-size:14px;">delete</span>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                             <div>
                                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><h4 style="margin:0;display:flex;align-items:center;gap:6px;"><span class="material-icons" style="font-size:16px;">source</span> Tracked Repositories</h4><button class="btn btn-xs btn-primary" onclick="showAddRepoModal()"><span class="material-icons" style="font-size:14px;">add</span> Add Repo</button></div>
-                                <div class="table-wrapper"><table class="data-table"><thead><tr><th>Token</th><th>Repository</th><th>Branch</th><th>Actions</th></tr></thead><tbody id="ghReposTableBody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px;">No repos tracked</td></tr></tbody></table></div>
+                                <div class="table-wrapper">
+                                    <table class="data-table">
+                                        <thead><tr><th>Token</th><th>Repository</th><th>Branch</th><th>Actions</th></tr></thead>
+                                        <tbody>
+                                            <tr x-show="githubRepos.length === 0">
+                                                <td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px;">No repos tracked</td>
+                                            </tr>
+                                            <template x-for="r in githubRepos" :key="r.id">
+                                                <tr>
+                                                    <td><span x-show="r.is_public" style="color:var(--accent);font-weight:600;">🌐 Public</span><span x-show="!r.is_public" x-text="r.token_name"></span></td>
+                                                    <td><code style="font-family:'JetBrains Mono',monospace;" x-text="r.full_name"></code></td>
+                                                    <td><span x-show="r.branch" class="tag" x-text="r.branch"></span><span x-show="!r.branch" style="color:var(--text-muted);">All</span></td>
+                                                    <td class="action-btns">
+                                                        <button class="btn btn-xs" style="background:var(--tertiary);color:var(--text);border:1px solid var(--border);" x-on:click.prevent="showEditRepoModal(r.id, r.full_name, r.branch || '', r.is_public ? true : false, r.token_id || '')" title="Edit branch">
+                                                            <span class="material-icons" style="font-size:14px;">edit</span>
+                                                        </button>
+                                                        <button class="btn btn-xs btn-danger" x-on:click.prevent="deleteRepo(r.id, r.full_name)" title="Remove repo">
+                                                            <span class="material-icons" style="font-size:14px;">delete</span>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <div id="ghWorkflowRuns"><div class="empty-state"><span class="material-icons empty-icon" style="font-size:48px;color:var(--text-muted);">rocket_launch</span><p style="color:var(--text-muted);">Add a token and repository to see workflow runs.</p></div></div>
+                    <div id="ghWorkflowRuns">
+                        <div x-show="githubWorkflows.length === 0" class="empty-state">
+                            <span class="material-icons empty-icon" style="font-size:48px;color:var(--text-muted);">rocket_launch</span>
+                            <p style="color:var(--text-muted);">Add a token and repository to see workflow runs.</p>
+                        </div>
+                        <template x-for="repo in githubWorkflows" :key="repo.repo">
+                            <div style="background:var(--card);border-radius:8px;padding:16px;margin-bottom:12px;border:1px solid var(--border);" :style="'border-left:3px solid ' + (repo.runs && repo.runs.length > 0 ? getWorkflowStatusColor(repo.runs[0]) : '#6B7280')">
+                                <div x-show="repo.error" style="color:var(--danger);font-size:13px;margin-bottom:8px;">
+                                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                                        <span class="material-icons" style="font-size:18px;">source</span>
+                                        <strong style="font-family:'JetBrains Mono',monospace;font-size:14px;" x-text="repo.repo"></strong>
+                                        <span x-show="repo.branch" class="tag" x-text="repo.branch"></span>
+                                    </div>
+                                    <span>⚠ </span><span x-text="repo.error"></span>
+                                </div>
+                                <div x-show="!repo.error">
+                                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                                        <div style="display:flex;align-items:center;gap:8px;">
+                                            <span class="material-icons" style="font-size:18px;">source</span>
+                                            <strong style="font-family:'JetBrains Mono',monospace;font-size:14px;">
+                                                <a :href="'https://github.com/' + repo.repo" target="_blank" style="color:var(--text);text-decoration:none;" x-text="repo.repo"></a>
+                                            </strong>
+                                            <span x-show="repo.branch" class="tag" x-text="repo.branch"></span>
+                                        </div>
+                                        <span style="font-size:12px;color:var(--text-muted);" x-text="(repo.runs || []).length + ' run(s)'"></span>
+                                    </div>
+                                    <div x-show="!repo.runs || repo.runs.length === 0" style="text-align:center;color:var(--text-muted);font-size:13px;padding:12px;">No recent workflow runs found.</div>
+                                    <template x-for="run in (repo.runs || [])" :key="run.id">
+                                        <a :href="run.html_url || '#'" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:6px;margin-bottom:4px;text-decoration:none;color:var(--text);background:var(--secondary);transition:background 0.15s;">
+                                            <span style="font-size:16px;" x-html="getWorkflowStatusIcon(run.status, run.conclusion)"></span>
+                                            <div style="flex:1;min-width:0;">
+                                                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                                                    <span style="font-weight:500;font-size:13px;" x-text="run.name || 'Workflow'"></span>
+                                                    <span class="tag" style="font-size:11px;" :style="'background:' + getWorkflowStatusColor(run) + '20;color:' + getWorkflowStatusColor(run) + ';border-color:' + getWorkflowStatusColor(run) + '40;'" x-text="run.branch || ''"></span>
+                                                    <code x-show="run.commit" style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;" x-text="run.commit"></code>
+                                                </div>
+                                                <div style="font-size:12px;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                                    <span x-text="run.commit_message ? (run.commit_message.length > 60 ? run.commit_message.substring(0, 60) + '…' : run.commit_message) : ''"></span>
+                                                    <span x-show="run.commit_message"> · </span>
+                                                    <span x-text="run.actor || ''"></span>
+                                                    <span x-show="run.actor"> · </span>
+                                                    <span x-text="timeAgo(run.started_at)"></span>
+                                                </div>
+                                            </div>
+                                            <span class="material-icons" style="font-size:16px;color:var(--text-muted);">open_in_new</span>
+                                        </a>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
                 </div>
 
-                <!-- ═══ VPS Detail Page ═══ -->
+                <!-- ═══ VPS Detail Page (Alpine) ═══ -->
                 <div id="page-vps-detail" class="page" x-show="activePage === 'vps-detail'">
                     <div class="page-header">
                         <div class="breadcrumb">
-                            <a href="#" onclick="showPage('vps-list')">Instances</a>
+                            <a href="#" @click.prevent="navigate('vps-list')">Instances</a>
                             <span class="material-icons breadcrumb-sep">chevron_right</span>
-                            <span id="detailVPSName">Loading...</span>
+                            <span x-text="detailVPS?.name || 'Loading...'"></span>
                         </div>
                         <div class="header-actions">
-                            <button class="btn btn-sm" onclick="refreshVPSDetail()"><span class="material-icons" style="font-size:16px">refresh</span> Refresh</button>
-                            <button id="openTerminalBtn" class="btn btn-sm btn-primary" onclick="openTerminal(currentVPSId)"><span class="material-icons" style="font-size:16px">terminal</span> Terminal</button>
+                            <button class="btn btn-sm" @click.prevent="refreshDetail()"><span class="material-icons" style="font-size:16px">refresh</span> Refresh</button>
+                            <button class="btn btn-sm btn-primary" @click.prevent="openTerminal(detailVPSId)" id="openTerminalBtn"><span class="material-icons" style="font-size:16px">terminal</span> Terminal</button>
                         </div>
                     </div>
+
+                    <!-- System Info + Resources -->
                     <div class="detail-grid">
-                        <div class="card"><div class="card-header"><span class="material-icons" style="font-size:18px;margin-right:8px">info</span><h3>System Info</h3></div><div class="card-body" id="vpsInfoBody"><div class="loading">Loading...</div></div></div>
-                        <div class="card"><div class="card-header"><span class="material-icons" style="font-size:18px;margin-right:8px">monitoring</span><h3>Resources</h3></div><div class="card-body" id="vpsResourceBody"><div class="loading">Loading...</div></div></div>
-                    </div>
-                    <div class="tabs">
-                        <button class="tab active" data-tab="containers" onclick="switchTab('containers')"><span class="material-icons" style="font-size:16px;margin-right:4px">view_in_ar</span> Containers</button>
-                        <button class="tab" data-tab="logs" onclick="switchTab('logs')"><span class="material-icons" style="font-size:16px;margin-right:4px">article</span> System Logs</button>
-                        <button id="tabBtnTerminal" class="tab" data-tab="terminal" onclick="switchTab('terminal')"><span class="material-icons" style="font-size:16px;margin-right:4px">terminal</span> Terminal</button>
-                        <button id="tabBtnQuickCmd" class="tab" data-tab="quickcmd" onclick="switchTab('quickcmd')"><span class="material-icons" style="font-size:16px;margin-right:4px">bolt</span> Quick Command</button>
-                    </div>
-                    <div id="tab-containers" class="tab-content active"><div id="containerList"><div class="loading">Loading containers...</div></div></div>
-                    <div id="tab-logs" class="tab-content">
-                        <div class="log-controls">
-                            <select id="logType"><option value="syslog">System Log</option><option value="auth">Auth / SSH</option><option value="kernel">Kernel</option><option value="docker">Docker</option><option value="nginx">Nginx</option></select>
-                            <input type="number" id="logTail" value="200" min="10" max="1000" style="width:100px">
-                            <button class="btn btn-sm btn-primary" onclick="loadVPSLogs()"><span class="material-icons" style="font-size:14px">play_arrow</span> Load</button>
+                        <div class="card">
+                            <div class="card-header"><span class="material-icons" style="font-size:18px;margin-right:8px">info</span><h3>System Info</h3></div>
+                            <div class="card-body" id="vpsInfoBody">
+                                <div x-show="!detailInfo" class="loading">Loading...</div>
+                                <template x-if="detailInfo">
+                                    <div>
+                                        <div class="sysinfo-section">
+                                            <div class="sysinfo-title"><span class="material-icons">dns</span> System</div>
+                                            <div class="sysinfo-grid">
+                                                <div class="sysinfo-item">
+                                                    <span class="sysinfo-icon">🖥️</span>
+                                                    <div class="sysinfo-text">
+                                                        <span class="sysinfo-label">Hostname</span>
+                                                        <span class="sysinfo-val" x-text="detailInfo.hostname"></span>
+                                                    </div>
+                                                </div>
+                                                <div class="sysinfo-item">
+                                                    <span class="sysinfo-icon">⏱️</span>
+                                                    <div class="sysinfo-text">
+                                                        <span class="sysinfo-label">Uptime</span>
+                                                        <span class="sysinfo-val" x-text="detailInfo.uptime"></span>
+                                                    </div>
+                                                </div>
+                                                <div class="sysinfo-item">
+                                                    <span class="sysinfo-icon">🤖</span>
+                                                    <div class="sysinfo-text">
+                                                        <span class="sysinfo-label">OS</span>
+                                                        <span class="sysinfo-val sysinfo-os" x-text="detailInfo.os"></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="sysinfo-section">
+                                            <div class="sysinfo-title"><span class="material-icons">memory</span> Hardware</div>
+                                            <div class="sysinfo-grid">
+                                                <div class="sysinfo-item">
+                                                    <span class="sysinfo-icon">🧠</span>
+                                                    <div class="sysinfo-text">
+                                                        <span class="sysinfo-label">CPU</span>
+                                                        <span class="sysinfo-val" x-text="detailInfo.cpu_model"></span>
+                                                    </div>
+                                                </div>
+                                                <div class="sysinfo-item">
+                                                    <span class="sysinfo-icon">🔢</span>
+                                                    <div class="sysinfo-text">
+                                                        <span class="sysinfo-label">Cores</span>
+                                                        <span class="sysinfo-val" x-text="detailInfo.cpu_cores"></span>
+                                                    </div>
+                                                </div>
+                                                <div class="sysinfo-item">
+                                                    <span class="sysinfo-icon">💻</span>
+                                                    <div class="sysinfo-text">
+                                                        <span class="sysinfo-label">Kernel</span>
+                                                        <span class="sysinfo-val" x-text="detailInfo.kernel"></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
                         </div>
-                        <pre class="log-viewer" id="logViewer">Select log type and click Load</pre>
+                        <div class="card">
+                            <div class="card-header"><span class="material-icons" style="font-size:18px;margin-right:8px">monitoring</span><h3>Resources</h3></div>
+                            <div class="card-body">
+                                <div x-show="!detailResources" class="loading">Loading...</div>
+                                <template x-if="detailResources">
+                                    <div class="resource-grid">
+                                        <div class="resource-row" x-show="detailInfo?.uptime">
+                                            <div class="resource-icon">⏱️</div>
+                                            <div class="resource-info">
+                                                <div class="resource-title">Uptime</div>
+                                                <div class="resource-value resource-uptime" x-text="detailInfo?.uptime"></div>
+                                            </div>
+                                        </div>
+                                        <div class="resource-row">
+                                            <div class="resource-icon">🧠</div>
+                                            <div class="resource-info">
+                                                <div class="resource-title">CPU Usage</div>
+                                                <div class="resource-value" x-text="detailResources.cpu_percent + '%'"></div>
+                                                <div class="resource-bar-lg"><div class="resource-bar-lg-fill" :style="'width:' + detailResources.cpu_percent + '%;background:' + resourceColor(detailResources.cpu_percent)"></div></div>
+                                            </div>
+                                        </div>
+                                        <div class="resource-row" x-show="detailResources.memory?.total_mb">
+                                            <div class="resource-icon">💾</div>
+                                            <div class="resource-info">
+                                                <div class="resource-title">Memory</div>
+                                                <div class="resource-value" x-text="detailResources.memory.used_mb + ' MB / ' + detailResources.memory.total_mb + ' MB (' + detailResources.memory.percent + '%)'"></div>
+                                                <div class="resource-bar-lg"><div class="resource-bar-lg-fill" :style="'width:' + detailResources.memory.percent + '%;background:' + resourceColor(detailResources.memory.percent)"></div></div>
+                                            </div>
+                                        </div>
+                                        <div class="resource-row" x-show="detailResources.disk?.total">
+                                            <div class="resource-icon">💿</div>
+                                            <div class="resource-info">
+                                                <div class="resource-title">Disk</div>
+                                                <div class="resource-value" x-text="detailResources.disk.used + ' / ' + detailResources.disk.total + ' (' + detailResources.disk.percent + '%)'"></div>
+                                                <div class="resource-bar-lg"><div class="resource-bar-lg-fill" :style="'width:' + (parseInt(detailResources.disk.percent)||0) + '%;background:' + resourceColor(detailResources.disk.percent)"></div></div>
+                                            </div>
+                                        </div>
+                                        <div class="resource-row" x-show="detailResources.load_avg">
+                                            <div class="resource-icon">⚖️</div>
+                                            <div class="resource-info">
+                                                <div class="resource-title">Load Average</div>
+                                                <div class="resource-value" x-text="detailResources.load_avg.join(' · ')"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
                     </div>
-                    <div id="tab-terminal" class="tab-content">
+
+                    <!-- Tabs -->
+                    <div class="tabs">
+                        <button class="tab" :class="detailTab === 'containers' ? 'active' : ''" @click.prevent="detailTab='containers';loadContainersAlpine()">
+                            <span class="material-icons" style="font-size:16px;margin-right:4px">view_in_ar</span> Containers
+                        </button>
+                        <button class="tab" :class="detailTab === 'logs' ? 'active' : ''" @click.prevent="detailTab='logs'">
+                            <span class="material-icons" style="font-size:16px;margin-right:4px">article</span> System Logs
+                        </button>
+                        <button id="tabBtnTerminal" class="tab" :class="detailTab === 'terminal' ? 'active' : ''" @click.prevent="detailTab='terminal'">
+                            <span class="material-icons" style="font-size:16px;margin-right:4px">terminal</span> Terminal
+                        </button>
+                        <button id="tabBtnQuickCmd" class="tab" :class="detailTab === 'quickcmd' ? 'active' : ''" @click.prevent="detailTab='quickcmd'">
+                            <span class="material-icons" style="font-size:16px;margin-right:4px">bolt</span> Quick Command
+                        </button>
+                    </div>
+
+                    <!-- Tab: Containers -->
+                    <div x-show="detailTab === 'containers'">
+                        <div x-show="detailContainers === null" class="loading">Loading containers...</div>
+                        <div x-show="detailContainers && detailContainers.length === 0" class="empty-state">
+                            <div class="empty-icon">🐳</div><p>No containers running</p>
+                        </div>
+                        <div class="container-grid" x-show="detailContainers && detailContainers.length > 0">
+                            <template x-for="c in detailContainers" :key="c.id">
+                                <div class="container-card" :class="c.state">
+                                    <div class="container-header">
+                                        <div class="container-name">
+                                            <span class="container-state" :class="c.state" x-text="c.state"></span>
+                                            <span x-text="c.name"></span>
+                                        </div>
+                                        <button class="container-delete-btn" x-show="isOperator" @click.prevent="confirmDeleteContainerAlpine(c.id, c.name)" title="Remove container">
+                                            <span class="material-icons">delete</span>
+                                        </button>
+                                    </div>
+                                    <div class="container-meta">
+                                        <div x-text="'Image: ' + c.image"></div>
+                                        <div x-text="'Status: ' + c.status"></div>
+                                        <div x-show="c.ports" x-text="'Ports: ' + c.ports"></div>
+                                    </div>
+                                    <div class="container-actions" x-show="isOperator">
+                                        <button class="btn btn-sm" x-show="c.state === 'running'" @click.prevent="containerActionAlpine(c.id, 'stop')">
+                                            <span class="material-icons">stop_circle</span> Stop
+                                        </button>
+                                        <button class="btn btn-sm" x-show="c.state === 'running'" @click.prevent="containerActionAlpine(c.id, 'restart')">
+                                            <span class="material-icons">replay</span> Restart
+                                        </button>
+                                        <button class="btn btn-sm btn-primary" x-show="c.state !== 'running'" @click.prevent="containerActionAlpine(c.id, 'start')">
+                                            <span class="material-icons">play_arrow</span> Start
+                                        </button>
+                                    </div>
+                                    <div class="container-actions" style="margin-top:4px;">
+                                        <button class="btn btn-sm icon-btn" @click.prevent="showContainerLogsAlpine(c.id, c.name)" title="Logs">
+                                            <span class="material-icons">article</span>
+                                        </button>
+                                        <button class="btn btn-sm icon-btn" @click.prevent="showContainerStatsAlpine(c.id, c.name)" title="Stats">
+                                            <span class="material-icons">monitoring</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Tab: System Logs -->
+                    <div x-show="detailTab === 'logs'">
+                        <div class="log-controls">
+                            <select id="logType" style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:13px;">
+                                <option value="syslog">System Log</option>
+                                <option value="auth">Auth / SSH</option>
+                                <option value="kernel">Kernel</option>
+                                <option value="docker">Docker</option>
+                                <option value="nginx">Nginx</option>
+                            </select>
+                            <input type="number" id="logTail" value="200" min="10" max="1000" style="width:100px;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:13px;">
+                            <button class="btn btn-sm btn-primary" @click.prevent="loadVPSLogsAlpine()"><span class="material-icons" style="font-size:14px">play_arrow</span> Load</button>
+                        </div>
+                        <pre class="log-viewer" id="logViewer" x-text="detailLogs || 'Select log type and click Load'"></pre>
+                    </div>
+
+                    <!-- Tab: Terminal -->
+                    <div x-show="detailTab === 'terminal'">
                         <div class="terminal-wrapper">
                             <div id="terminalSessionBar" class="terminal-session-bar"></div>
                             <div class="terminal-bar">
                                 <div class="terminal-bar-left"><span class="material-icons" style="font-size:14px;margin-right:6px">terminal</span><span id="terminalStatus">Disconnected</span></div>
                                 <div class="terminal-bar-right">
-                                    <button class="btn btn-xs btn-primary" onclick="connectTerminal()">Connect</button>
-                                    <button class="btn btn-xs" onclick="disconnectTerminal()">Disconnect</button>
-                                    <button class="btn btn-xs" onclick="toggleTerminalFullscreen()" title="Toggle Fullscreen"><span class="material-icons" style="font-size:14px">fullscreen</span></button>
+                                    <button class="btn btn-xs btn-primary" @click.prevent="connectTerminalAlpine()">Connect</button>
+                                    <button class="btn btn-xs" @click.prevent="disconnectTerminalAlpine()">Disconnect</button>
+                                    <button class="btn btn-xs" @click.prevent="toggleTerminalFullscreenAlpine()" title="Toggle Fullscreen"><span class="material-icons" style="font-size:14px">fullscreen</span></button>
                                 </div>
                             </div>
                             <div id="terminalSessionsContainer" class="terminal-sessions-container"></div>
                             <div id="terminalContainer" class="terminal-container"></div>
                         </div>
                     </div>
-                    <div id="tab-quickcmd" class="tab-content">
+
+                    <!-- Tab: Quick Command -->
+                    <div x-show="detailTab === 'quickcmd'">
                         <div class="quick-cmd">
                             <div class="cmd-presets">
-                                <button class="btn btn-sm" onclick="runQuickCmd('uptime')">uptime</button>
-                                <button class="btn btn-sm" onclick="runQuickCmd('df -h')">df -h</button>
-                                <button class="btn btn-sm" onclick="runQuickCmd('free -m')">free -m</button>
-                                <button class="btn btn-sm" onclick="runQuickCmd('docker ps')">docker ps</button>
-                                <button class="btn btn-sm" onclick="runQuickCmd('docker stats --no-stream')">docker stats</button>
-                                <button class="btn btn-sm" onclick="runQuickCmd('top -bn1 | head -20')">top</button>
-                                <button class="btn btn-sm" onclick="runQuickCmd('netstat -tlnp 2>/dev/null || ss -tlnp')">ports</button>
-                                <button class="btn btn-sm" onclick="runQuickCmd('iptables -L -n 2>/dev/null | head -30')">firewall</button>
+                                <button class="btn btn-sm" @click.prevent="runQuickCmdAlpine('uptime')">uptime</button>
+                                <button class="btn btn-sm" @click.prevent="runQuickCmdAlpine('df -h')">df -h</button>
+                                <button class="btn btn-sm" @click.prevent="runQuickCmdAlpine('free -m')">free -m</button>
+                                <button class="btn btn-sm" @click.prevent="runQuickCmdAlpine('docker ps')">docker ps</button>
+                                <button class="btn btn-sm" @click.prevent="runQuickCmdAlpine('docker stats --no-stream')">docker stats</button>
+                                <button class="btn btn-sm" @click.prevent="runQuickCmdAlpine('top -bn1 | head -20')">top</button>
+                                <button class="btn btn-sm" @click.prevent="runQuickCmdAlpine('netstat -tlnp 2>/dev/null || ss -tlnp')">ports</button>
+                                <button class="btn btn-sm" @click.prevent="runQuickCmdAlpine('iptables -L -n 2>/dev/null | head -30')">firewall</button>
                             </div>
                             <div class="cmd-input-row">
-                                <input type="text" id="quickCmdInput" placeholder="Enter command..." onkeydown="if(event.key==='Enter')runQuickCmd()">
-                                <button class="btn btn-primary" onclick="runQuickCmd()"><span class="material-icons" style="font-size:16px">play_arrow</span> Run</button>
+                                <input type="text" id="quickCmdInput" placeholder="Enter command..." @keydown.enter.prevent="runQuickCmdAlpine()" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px;outline:none;">
+                                <button class="btn btn-primary" @click.prevent="runQuickCmdAlpine()"><span class="material-icons" style="font-size:16px">play_arrow</span> Run</button>
                             </div>
-                            <pre class="cmd-output" id="quickCmdOutput">Output will appear here...</pre>
+                            <pre class="cmd-output" id="quickCmdOutput" x-text="detailQuickCmdOutput || 'Output will appear here...'"></pre>
                         </div>
                     </div>
                 </div>
@@ -715,12 +1211,19 @@
                     </div>
                     <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;">Create and manage reusable scripts to run across your VPS instances.</p>
                     <div class="stat-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
-                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Total Scripts</div><div style="font-size:22px;font-weight:700;margin-top:4px;" id="statTotalScripts">0</div></div>
-                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Total Runs</div><div style="font-size:22px;font-weight:700;margin-top:4px;" id="statTotalRuns">0</div></div>
-                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Success Rate</div><div style="font-size:22px;font-weight:700;margin-top:4px;" id="statSuccessRate">—</div></div>
-                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Avg Duration</div><div style="font-size:22px;font-weight:700;margin-top:4px;" id="statAvgDuration">—</div></div>
-                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">⭐ Pinned</div><div style="font-size:22px;font-weight:700;margin-top:4px;" id="statPinned">0</div></div>
-                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;" id="statCategoryBreakdown"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Categories</div><div id="scriptStats" style="font-size:12px;margin-top:6px;color:var(--text-secondary);line-height:1.6;"></div></div>
+                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Total Scripts</div><div style="font-size:22px;font-weight:700;margin-top:4px;" x-text="scriptStats.totalScripts">0</div></div>
+                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Total Runs</div><div style="font-size:22px;font-weight:700;margin-top:4px;" x-text="scriptStats.totalRuns">0</div></div>
+                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Success Rate</div><div style="font-size:22px;font-weight:700;margin-top:4px;" x-text="scriptStats.successRate" :style="scriptStats.successRate !== '-' ? (parseInt(scriptStats.successRate) >= 80 ? 'color:var(--success)' : parseInt(scriptStats.successRate) >= 50 ? 'color:var(--warning)' : 'color:var(--danger)') : ''">—</div></div>
+                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Avg Duration</div><div style="font-size:22px;font-weight:700;margin-top:4px;" x-text="scriptStats.avgDuration">—</div></div>
+                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">⭐ Pinned</div><div style="font-size:22px;font-weight:700;margin-top:4px;" x-text="scriptStats.pinned">0</div></div>
+                        <div class="stat-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:14px 16px;" id="statCategoryBreakdown"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Categories</div><div id="scriptStats" style="font-size:12px;margin-top:6px;color:var(--text-secondary);line-height:1.6;">
+                            <template x-for="(count, cat) in scriptStats.categories" :key="cat">
+                                <div style="display:flex;justify-content:space-between;gap:8px;">
+                                    <span x-text="cat"></span>
+                                    <strong x-text="count"></strong>
+                                </div>
+                            </template>
+                        </div></div>
                     </div>
                     <div class="filter-bar" style="display:flex;gap:12px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
                         <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:200px;"><span class="material-icons" style="font-size:18px;color:var(--text-muted);">search</span><input type="text" id="scriptSearchInput" placeholder="Search scripts..." style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:13px;outline:none;" oninput="filterScripts()"></div>
@@ -728,9 +1231,78 @@
                         <select id="scriptSortFilter" onchange="filterScripts()" style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:13px;min-width:140px;"><option value="name">Name (A-Z)</option><option value="newest">Newest First</option><option value="oldest">Oldest First</option><option value="runs">Most Runs</option></select>
                     </div>
                     <div style="display:flex;gap:12px;margin-bottom:12px;"><button class="tab active" data-tab="all" onclick="setScriptTab('all')">📋 All</button><button class="tab" data-tab="favorites" onclick="setScriptTab('favorites')">⭐ Favorites</button></div>
-                    <div id="scriptGrid" class="card-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-bottom:24px;"><div class="empty-state" style="grid-column:1/-1;"><span class="material-icons empty-icon" style="font-size:48px;color:var(--text-muted);">code</span><p style="color:var(--text-muted);">No scripts yet. Create your first script to get started.</p></div></div>
+                    <div id="scriptGrid" class="card-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-bottom:24px;">
+                        <template x-if="scriptsData.length === 0">
+                            <div class="empty-state" style="grid-column:1/-1;">
+                                <span class="material-icons empty-icon" style="font-size:48px;color:var(--text-muted);">code</span>
+                                <p style="color:var(--text-muted);">No scripts yet. <a href="#" onclick="openScriptForm()">Create your first script</a></p>
+                            </div>
+                        </template>
+                        <template x-for="s in scriptsData" :key="s.id">
+                            <div class="card" style="position:relative;">
+                                <div class="card-header">
+                                    <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+                                        <span style="font-size:18px;" x-html="getScriptCategoryIcon(s.category || 'Custom')"></span>
+                                        <div style="flex:1;min-width:0;">
+                                            <div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" x-text="s.name"></div>
+                                            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;" x-text="s.description || ''"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+                                        <span class="tag" :class="'tag-' + (getScriptCategoryClass(s.category || 'Custom'))" x-text="s.category || 'Custom'"></span>
+                                        <span x-show="s.pinned" class="tag" style="background:var(--warning);color:#000;border:none;">⭐ Pinned</span>
+                                    </div>
+                                    <div style="font-size:12px;color:var(--text-muted);display:flex;gap:12px;flex-wrap:wrap;">
+                                        <span x-text="(s.run_count || 0) + ' runs'"></span>
+                                        <span x-show="s.avg_exec_time_ms" x-text="'Avg: ' + formatDuration(s.avg_exec_time_ms)"></span>
+                                    </div>
+                                </div>
+                                <div class="card-footer" style="display:flex;gap:6px;padding:12px 16px;border-top:1px solid var(--border);">
+                                    <button class="btn btn-sm btn-primary" x-on:click.prevent="runScriptAlpine(s.id, s.name)" x-show="isOperator">
+                                        <span class="material-icons" style="font-size:14px">play_arrow</span>
+                                    </button>
+                                    <button class="btn btn-sm" x-on:click.prevent="viewScriptCode(s.id)" title="View Code">
+                                        <span class="material-icons" style="font-size:14px">code</span>
+                                    </button>
+                                    <button class="btn btn-sm" x-on:click.prevent="toggleScriptPin(s.id)" title="Toggle Pin" x-text="s.pinned ? '⭐' : '☆'"></button>
+                                    <button class="btn btn-sm" x-on:click.prevent="openScriptForm(s.id)" x-show="isAdmin" title="Edit">
+                                        <span class="material-icons" style="font-size:14px">edit</span>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" x-on:click.prevent="deleteScript(s.id, s.name)" x-show="isAdmin" title="Delete">
+                                        <span class="material-icons" style="font-size:14px">delete</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
                     <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;"><h3 style="margin:0;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px;"><span class="material-icons" style="font-size:18px;color:var(--text-muted);">history</span> Recent Runs</h3></div>
-                    <div class="table-wrapper"><table class="data-table"><thead><tr><th>Status</th><th>Script</th><th>VPS</th><th>Duration</th><th>Started</th><th>Triggered By</th><th>Actions</th></tr></thead><tbody id="scriptRecentRuns"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No runs yet</td></tr></tbody></table></div>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead><tr><th>Status</th><th>Script</th><th>VPS</th><th>Duration</th><th>Started</th><th>Triggered By</th><th>Actions</th></tr></thead>
+                            <tbody>
+                                <tr x-show="scriptRuns.length === 0">
+                                    <td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">No runs yet</td>
+                                </tr>
+                                <template x-for="run in scriptRuns" :key="run.id">
+                                    <tr>
+                                        <td><span x-show="run.status === 'success'" style="color:var(--success)">✅ Success</span><span x-show="run.status === 'failed'" style="color:var(--danger)">❌ Failed</span><span x-show="run.status === 'running'" style="color:var(--warning)">🟡 Running</span><span x-show="run.status === 'pending'" style="color:var(--text-muted)">⏳ Pending</span></td>
+                                        <td><span x-text="run.script_name"></span></td>
+                                        <td><code style="font-size:12px;" x-text="run.vps_name"></code></td>
+                                        <td style="font-size:12px;" x-text="run.duration_ms ? formatDuration(run.duration_ms) : '-'"></td>
+                                        <td style="font-size:12px;color:var(--text-muted);" x-text="run.started_at ? timeAgo(run.started_at) : '-'"></td>
+                                        <td style="font-size:12px;" x-text="run.triggered_by || '-'"></td>
+                                        <td>
+                                            <button class="btn btn-xs" x-on:click.prevent="viewScriptRunOutputAlpine(run.id)" title="View output">
+                                                <span class="material-icons" style="font-size:14px">article</span>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <!-- ═══ Docker Compose Page ═══ -->
@@ -828,11 +1400,7 @@
                     <div class="card" style="margin-bottom:16px;">
                         <div class="card-header"><span class="material-icons" style="font-size:18px;margin-right:8px">security</span><h3>Two-Factor Authentication (TOTP)</h3></div>
                         <div class="card-body">
-                            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-                                <div><span style="font-size:13px;color:var(--text-muted);">Status:</span><span id="totpStatus" style="font-weight:600;margin-left:4px;color:var(--text-muted);">Checking...</span></div>
-                                <button class="btn btn-primary" id="totpSetupBtn" onclick="setupTotp()" style="display:none;"><span class="material-icons" style="font-size:16px">lock</span> Setup TOTP</button>
-                                <button class="btn btn-danger" id="totpDisableBtn" onclick="disableTotp()" style="display:none;"><span class="material-icons" style="font-size:16px">lock_open</span> Disable</button>
-                            </div>
+                            <div x-html="totpStatus" id="totpStatus" style="font-weight:600;"></div>
                         </div>
                     </div>
                     <div class="card">
@@ -840,12 +1408,12 @@
                         <div class="card-body">
                             <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Your account profile details. Contact your administrator to update these fields.</p>
                             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-                                <div><label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Username</label><span id="settingsUsername" style="font-size:14px;font-weight:500;">-</span></div>
-                                <div><label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Role</label><span id="settingsRole" style="font-size:14px;font-weight:500;">-</span></div>
-                                <div><label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Display Name</label><span id="settingsDisplayName" style="font-size:14px;font-weight:500;">-</span></div>
-                                <div><label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">VPS Access</label><span id="settingsVpsCount" style="font-size:14px;font-weight:500;">-</span></div>
-                                <div><label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Groups</label><span id="settingsGroups" style="font-size:14px;font-weight:500;">-</span></div>
-                                <div><label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Created At</label><span id="settingsCreatedAt" style="font-size:14px;font-weight:500;">-</span></div>
+                                <div><label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Username</label><span style="font-size:14px;font-weight:500;" x-text="currentUser?.username || '-'">-</span></div>
+                                <div><label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Role</label><span style="font-size:14px;font-weight:500;" x-text="currentUser ? ({admin:'🛡️ Admin',operator:'🔧 Operator',viewer:'👁️ Viewer'}[currentUser.role] || currentUser.role) : '-'">-</span></div>
+                                <div><label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Display Name</label><span style="font-size:14px;font-weight:500;" x-text="currentUser?.display_name || currentUser?.username || '-'">-</span></div>
+                                <div><label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">VPS Access</label><span style="font-size:14px;font-weight:500;" x-text="currentUser?.vps_access ? currentUser.vps_access.length + ' instance(s)' : '-'">-</span></div>
+                                <div><label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Groups</label><span style="font-size:14px;font-weight:500;" x-text="currentUser?.group_names && currentUser.group_names.length > 0 ? currentUser.group_names.join(', ') : 'None'">-</span></div>
+                                <div><label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Created At</label><span style="font-size:14px;font-weight:500;" id="settingsCreatedAt">-</span></div>
                             </div>
                         </div>
                     </div>

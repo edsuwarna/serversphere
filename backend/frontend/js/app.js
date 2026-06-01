@@ -34,6 +34,55 @@ function alpineApp() {
         toasts: [],
         _toastId: 0,
 
+        // ── Auto-refresh ──
+        autoRefresh: false,
+        _refreshInterval: null,
+        loading: false,
+        _loadingCount: 0,
+
+        // ── Users ──
+        usersData: [],
+
+        // ── Audit Logs ──
+        auditData: [],
+        auditTotal: 0,
+        auditPage: 1,
+
+        // ── SSH Keys ──
+        sshKeysData: [],
+
+        // ── Groups ──
+        groupsData: [],
+
+        // ── GitHub Actions ──
+        githubStats: { totalRepos: 0, successCount: 0, failedCount: 0, runningCount: 0 },
+        githubTokens: [],
+        githubRepos: [],
+        githubWorkflows: [],
+
+        // ── Scripts ──
+        scriptStats: { totalScripts: 0, totalRuns: 0, successRate: '-', avgDuration: '-', pinned: 0, categories: {} },
+        scriptsData: [],
+        scriptRuns: [],
+
+        // ── Settings ──
+        totpStatus: 'Checking...',
+
+        // ── VPS List ──
+        vpsListData: [],
+        vpsListFilter: { query: '' },
+        vpsListSelected: new Set(),
+
+        // ── VPS Detail ──
+        detailVPSId: null,
+        detailVPS: null,
+        detailInfo: null,
+        detailResources: null,
+        detailContainers: null,
+        detailTab: 'containers',
+        detailLogs: '',
+        detailQuickCmdOutput: '',
+
         // ── Page titles ──
         pageTitles: {
             'dashboard': 'Overview',
@@ -61,6 +110,12 @@ function alpineApp() {
                 if (saved) this.theme = saved;
             } catch {}
             this.applyTheme();
+            // Auto-collapse sidebar on mobile
+            if (window.innerWidth < 768) this.sidebarCollapsed = true;
+            window.addEventListener('resize', () => {
+                if (window.innerWidth < 768) this.sidebarCollapsed = true;
+            });
+            this.initKeyboardShortcuts();
         },
 
         // ── Theme ──
@@ -199,6 +254,245 @@ function alpineApp() {
         logout() {
             if (typeof logout === 'function') logout();
         },
+
+        // ── Audit Log Helpers ──
+        formatAuditActionLabel(action) {
+            if (typeof formatAuditAction === 'function') return formatAuditAction(action);
+            return action || '';
+        },
+        showAuditDetailAlpine(log) {
+            if (typeof showAuditDetail === 'function') {
+                // Create a fake element to pass to showAuditDetail
+                const fakeEl = { dataset: { log: JSON.stringify(log) } };
+                showAuditDetail(fakeEl);
+            }
+        },
+
+        // ── GitHub Actions Helpers ──
+        getWorkflowStatusColor(run) {
+            if (!run) return '#6B7280';
+            if (run.status === 'completed') {
+                if (run.conclusion === 'success') return '#22C55E';
+                if (run.conclusion === 'failure' || run.conclusion === 'cancelled') return '#EF4444';
+                return '#6B7280';
+            }
+            if (run.status === 'in_progress' || run.status === 'queued') return '#F59E0B';
+            return '#6B7280';
+        },
+        getWorkflowStatusIcon(status, conclusion) {
+            if (status === 'completed' && conclusion === 'success') return '✅';
+            if (status === 'completed' && conclusion === 'failure') return '❌';
+            if (status === 'completed' && conclusion === 'cancelled') return '⏹️';
+            if (status === 'in_progress') return '🟡';
+            if (status === 'queued') return '⏳';
+            return '⬜';
+        },
+
+        // ── Scripts Helpers ──
+        getScriptCategoryIcon(category) {
+            if (typeof getScriptCategoryIcon === 'function') return getScriptCategoryIcon(category);
+            return '📜';
+        },
+        getScriptCategoryClass(category) {
+            if (typeof getScriptCategoryClass === 'function') return getScriptCategoryClass(category);
+            return '';
+        },
+        runScriptAlpine(id, name) {
+            if (typeof openScriptRunModal === 'function') openScriptRunModal(id, name);
+        },
+        viewScriptCode(id) {
+            if (typeof viewScriptCodeGlobal === 'function') viewScriptCodeGlobal(id);
+            else showToast('View code not available', 'info');
+        },
+        toggleScriptPin(id) {
+            if (typeof toggleScriptPinGlobal === 'function') toggleScriptPinGlobal(id);
+            else showToast('Toggle pin not available', 'info');
+        },
+        openScriptForm(id) {
+            if (typeof openScriptForm === 'function') openScriptForm(id);
+        },
+        deleteScript(id, name) {
+            if (typeof deleteScript === 'function') deleteScript(id);
+        },
+        viewScriptRunOutputAlpine(id) {
+            if (typeof viewScriptRunOutput === 'function') viewScriptRunOutput(id);
+        },
+
+        // ── Time/Duration helpers ──
+        timeAgo(ts) {
+            if (typeof timeAgo === 'function') return timeAgo(ts);
+            return ts || '';
+        },
+        formatDuration(ms) {
+            if (typeof formatDuration === 'function') return formatDuration(ms);
+            return ms ? ms + 'ms' : '-';
+        },
+
+        // ── VPS List computed ──
+        get filteredVPSList() {
+            let list = [...this.vpsListData];
+            if (this.vpsListFilter.query.trim()) {
+                const q = this.vpsListFilter.query.toLowerCase();
+                list = list.filter(v =>
+                    v.name.toLowerCase().includes(q) ||
+                    v.host.toLowerCase().includes(q) ||
+                    (v.tags && v.tags.some(t => t.toLowerCase().includes(q)))
+                );
+            }
+            return list;
+        },
+
+        // ── VPS List Actions ──
+        toggleVPSListSelect(id) {
+            if (this.vpsListSelected.has(id)) {
+                this.vpsListSelected.delete(id);
+            } else {
+                this.vpsListSelected.add(id);
+            }
+            // Trigger reactivity via reassignment
+            this.vpsListSelected = new Set(this.vpsListSelected);
+        },
+        clearVPSListSelection() {
+            this.vpsListSelected = new Set();
+        },
+        navigateToVPSDetail(id) {
+            if (typeof showVPSDetail === 'function') showVPSDetail(id);
+        },
+        async runQuickAction(vpsId, cmd) {
+            this.showLoading();
+            try {
+                const r = await api('POST', `/vps/${vpsId}/exec`, { command: cmd, timeout: 15 });
+                const output = r.stdout || r.stderr || 'No output';
+                // Show in a small toast for inline feel
+                showToast(`${cmd}: ${output.slice(0, 100)}${output.length > 100 ? '...' : ''}`, 'info');
+            } catch (err) {
+                showToast(`${cmd}: ${err.message}`, 'error');
+            } finally {
+                this.hideLoading();
+            }
+        },
+        showBulkCommandModalAlpine() {
+            const n = this.vpsListSelected.size;
+            if (n === 0) { showToast('No VPS selected', 'warning'); return; }
+            showToast('Open bulk command modal', 'info');
+            // Open existing vanilla modal
+            document.getElementById('bulkCmdCount').textContent = n;
+            document.getElementById('bulkCmdInput').value = '';
+            document.getElementById('bulkCmdTimeout').value = '30';
+            document.getElementById('bulkVpsList').textContent = n + ' VPS selected';
+            document.getElementById('bulkCmdModal').classList.remove('hidden');
+            document.getElementById('bulkCmdInput').focus();
+        },
+
+        // ── VPS Detail Actions ──
+        refreshDetail() {
+            if (!this.detailVPSId) return;
+            loadVPSInfo(this.detailVPSId);
+            loadVPSResources(this.detailVPSId);
+            loadContainers(this.detailVPSId);
+        },
+        loadContainersAlpine() {
+            if (this.detailVPSId && !this.detailContainers) {
+                loadContainers(this.detailVPSId);
+            }
+        },
+        runQuickCmdAlpine(cmd) {
+            if (cmd) document.getElementById('quickCmdInput').value = cmd;
+            if (typeof runQuickCmd === 'function') runQuickCmd(this.detailVPSId);
+        },
+        loadVPSLogsAlpine() {
+            if (typeof loadVPSLogs === 'function') loadVPSLogs(this.detailVPSId);
+        },
+        connectTerminalAlpine() {
+            if (typeof connectTerminal === 'function') connectTerminal();
+        },
+        disconnectTerminalAlpine() {
+            if (typeof disconnectTerminal === 'function') disconnectTerminal();
+        },
+        toggleTerminalFullscreenAlpine() {
+            if (typeof toggleTerminalFullscreen === 'function') toggleTerminalFullscreen();
+        },
+        containerActionAlpine(containerId, action) {
+            if (typeof containerAction === 'function') {
+                containerAction(this.detailVPSId, containerId, action, null);
+            }
+        },
+        confirmDeleteContainerAlpine(containerId, name) {
+            if (typeof confirmDeleteContainer === 'function') {
+                confirmDeleteContainer(this.detailVPSId, containerId, name);
+            }
+        },
+        showContainerLogsAlpine(containerId, containerName) {
+            if (typeof showContainerLogs === 'function') {
+                showContainerLogs(this.detailVPSId, containerId, containerName);
+            }
+        },
+        showContainerStatsAlpine(containerId, containerName) {
+            if (typeof showContainerStats === 'function') {
+                showContainerStats(this.detailVPSId, containerId, containerName);
+            }
+        },
+
+        // ── Auto-refresh ──
+        toggleAutoRefresh() {
+            this.autoRefresh = !this.autoRefresh;
+            if (this.autoRefresh) {
+                this._refreshInterval = setInterval(() => {
+                    if (this.activePage === 'dashboard') {
+                        if (typeof refreshDashboard === 'function') refreshDashboard();
+                    }
+                }, 30000);
+                showToast('Auto-refresh enabled (30s)', 'info');
+            } else {
+                if (this._refreshInterval) {
+                    clearInterval(this._refreshInterval);
+                    this._refreshInterval = null;
+                }
+                showToast('Auto-refresh disabled', 'info');
+            }
+        },
+
+        // ── Loading indicator ──
+        showLoading() {
+            this._loadingCount++;
+            this.loading = true;
+        },
+        hideLoading() {
+            this._loadingCount = Math.max(0, this._loadingCount - 1);
+            if (this._loadingCount === 0) this.loading = false;
+        },
+
+        // ── Keyboard Shortcuts ──
+        initKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                // Don't trigger in inputs/textarea
+                const tag = e.target.tagName;
+                if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+                // Ctrl+K = focus search
+                if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                    e.preventDefault();
+                    const searchInput = document.querySelector('#globalSearch');
+                    if (searchInput) searchInput.focus();
+                    return;
+                }
+                // g then d = go to dashboard
+                if (e.key === 'g' && !this._gPressed) {
+                    this._gPressed = true;
+                    setTimeout(() => this._gPressed = false, 500);
+                    return;
+                }
+                if (this._gPressed) {
+                    this._gPressed = false;
+                    if (e.key === 'd') { e.preventDefault(); this.navigate('dashboard'); return; }
+                    if (e.key === 'v') { e.preventDefault(); this.navigate('vps-list'); return; }
+                }
+                // Escape = close modals
+                if (e.key === 'Escape') {
+                    document.querySelectorAll('.modal:not(.hidden)').forEach(m => m.classList.add('hidden'));
+                }
+            });
+        },
     };
 }
 
@@ -245,24 +539,30 @@ function filterVPSByAccess(list) {
 
 // ─── API Helper ─────────────────────────────────────────────
 async function api(method, path, body = null) {
+    const alpine = typeof __alpine !== 'undefined' && __alpine ? __alpine : null;
+    if (alpine) alpine.showLoading();
     const opts = {
         method,
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
     };
     if (body) opts.body = JSON.stringify(body);
-    const res = await fetch(`/api${path}`, opts);
-    if (res.status === 401) {
-        showLogin();
-        throw new Error('Not authenticated');
+    try {
+        const res = await fetch(`/api${path}`, opts);
+        if (res.status === 401) {
+            showLogin();
+            throw new Error('Not authenticated');
+        }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ detail: res.statusText }));
+            throw new Error(err.detail || 'Request failed');
+        }
+        const ct = res.headers.get('content-type');
+        if (ct && ct.includes('text/plain')) return res.text();
+        return res.json();
+    } finally {
+        if (alpine) alpine.hideLoading();
     }
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(err.detail || 'Request failed');
-    }
-    const ct = res.headers.get('content-type');
-    if (ct && ct.includes('text/plain')) return res.text();
-    return res.json();
 }
 
 // ─── Auth ───────────────────────────────────────────────────
@@ -685,58 +985,15 @@ async function loadVPSList() {
             v.online = statusMap[v.id] === true;
         }
 
-        const container = document.getElementById('vpsCardGrid');
-        if (vpsList.length === 0) {
-            container.innerHTML = '<div class="empty-state"><span class="material-icons empty-icon" style="font-size:48px">dns</span><p>No VPS available.</p></div>';
-            return;
+        // Populate Alpine reactive data instead of innerHTML
+        if (__alpine) {
+            __alpine.vpsListData = vpsList.map(v => ({
+                ...v,
+                tags: v.tags || [],
+                group: v.group || '',
+            }));
+            __alpine.vpsListSelected = new Set(__alpine.vpsListSelected || []);
         }
-        container.innerHTML = vpsList.map(v => `
-            <div class="vps-card ${v.online ? 'online' : 'offline'}">
-                <div class="vps-card-header">
-                    <div class="vps-card-status">
-                        <span class="status-dot ${v.online ? 'online' : 'offline'}"></span>
-                        <span class="vps-card-name">${esc(v.name)}</span>
-                        <span class="status-label ${v.online ? 'online' : 'offline'}">${v.online ? '🟢 Online' : '🔴 Offline'}</span>
-                    </div>
-                    <div class="vps-card-check">
-                        <input type="checkbox" class="vps-checkbox" value="${v.id}" ${selectedVPSIds.has(v.id) ? 'checked' : ''} onchange="updateBulkActionBar()">
-                    </div>
-                </div>
-                <div class="vps-card-body">
-                    <div class="vps-card-info">
-                        <div class="vps-card-row">
-                            <span class="material-icons card-row-icon">computer</span>
-                            <code>${esc(v.host)}:${v.port}</code>
-                        </div>
-                        <div class="vps-card-row">
-                            <span class="material-icons card-row-icon">person</span>
-                            <span>${esc(v.username)}</span>
-                        </div>
-                        ${v.group ? `<div class="vps-card-row">
-                            <span class="material-icons card-row-icon">folder</span>
-                            <span class="tag">${esc(v.group)}</span>
-                        </div>` : ''}
-                        ${v.tags && v.tags.length ? `<div class="vps-card-row vps-card-tags">
-                            <span class="material-icons card-row-icon">label</span>
-                            ${v.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}
-                        </div>` : ''}
-                    </div>
-                </div>
-                <div class="vps-card-actions">
-                    <button class="btn btn-sm btn-primary" onclick="showVPSDetail('${v.id}')">
-                        <span class="material-icons" style="font-size:16px">open_in_new</span> Open
-                    </button>
-                    ${isAdmin() ? `
-                        <button class="btn btn-sm" onclick="editVPS('${v.id}')">
-                            <span class="material-icons" style="font-size:16px">edit</span> Edit
-                        </button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteVPS('${v.id}','${esc(v.name)}')">
-                            <span class="material-icons" style="font-size:16px">delete</span> Delete
-                        </button>
-                    ` : ''}
-                </div>
-            </div>
-        `).join('');
     } catch (err) {
         console.error('VPS list error:', err);
     }
@@ -1275,6 +1532,16 @@ async function deleteVPS(vpsId, name) {
 // ─── VPS Detail ─────────────────────────────────────────────
 async function showVPSDetail(vpsId) {
     currentVPSId = vpsId;
+    if (__alpine) {
+        __alpine.detailVPSId = vpsId;
+        __alpine.detailVPS = vpsList.find(v => v.id === vpsId) || null;
+        __alpine.detailInfo = null;
+        __alpine.detailResources = null;
+        __alpine.detailContainers = null;
+        __alpine.detailTab = 'containers';
+        __alpine.detailLogs = '';
+        __alpine.detailQuickCmdOutput = '';
+    }
     showPage('vps-detail');
 
     // Hide page nav active
@@ -1302,7 +1569,7 @@ async function refreshVPSDetail() {
 async function loadVPSInfo(vpsId) {
     try {
         const info = await api('GET', `/vps/${vpsId}/info`);
-        document.getElementById('vpsInfoBody').innerHTML = `
+        const html = `
             <div class="sysinfo-section">
                 <div class="sysinfo-title"><span class="material-icons">dns</span> System</div>
                 <div class="sysinfo-grid">
@@ -1355,6 +1622,18 @@ async function loadVPSInfo(vpsId) {
                     </div>
                 </div>
             </div>`;
+        document.getElementById('vpsInfoBody').innerHTML = html;
+        // Also populate Alpine data for reactive template
+        if (__alpine) {
+            __alpine.detailInfo = {
+                hostname: info.hostname,
+                uptime: info.uptime,
+                os: info.os,
+                cpu_model: info.cpu_model,
+                cpu_cores: info.cpu_cores,
+                kernel: info.kernel,
+            };
+        }
     } catch (err) {
         document.getElementById('vpsInfoBody').innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
     }
@@ -1436,6 +1715,24 @@ async function loadVPSResources(vpsId) {
         html += '</div>';
         document.getElementById('vpsResourceBody').innerHTML = html;
 
+        // Populate Alpine reactive data
+        if (__alpine) {
+            const resData = {
+                cpu_percent: parseFloat(r.cpu_percent) || 0,
+                memory: r.memory ? {
+                    total_mb: r.memory.total_mb,
+                    used_mb: r.memory.used_mb,
+                    percent: parseFloat(r.memory.percent) || 0,
+                } : null,
+                disk: r.disk ? {
+                    total: r.disk.total,
+                    used: r.disk.used,
+                    percent: r.disk.percent,
+                } : null,
+                load_avg: r.load_avg || null,
+            };
+            __alpine.detailResources = resData;
+        }
     } catch (err) {
         document.getElementById('vpsResourceBody').innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
     }
@@ -1464,7 +1761,7 @@ async function loadContainers(vpsId) {
                 <div class="container-header">
                     <div class="container-name">
                         <span class="container-state ${c.state}">${c.state}</span>
-                        ${esc(c.name)}
+                        ${escHtml(c.name)}
                     </div>
                     ${canAct ? `<button class="container-delete-btn" onclick="confirmDeleteContainer('${vpsId}','${c.id}','${esc(c.name)}')" title="Remove container">
                         <span class="material-icons">delete</span>
@@ -1497,6 +1794,18 @@ async function loadContainers(vpsId) {
                 </div>
             </div>
         `).join('') + '</div>';
+
+        // Populate Alpine data
+        if (__alpine) {
+            __alpine.detailContainers = containers.filter(c => !c.error).map(c => ({
+                id: c.id,
+                name: c.name,
+                image: c.image,
+                status: c.status,
+                state: c.state,
+                ports: c.ports || '',
+            }));
+        }
     } catch (err) {
         document.getElementById('containerList').innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
     }
@@ -1660,16 +1969,19 @@ function closeContainerStatsModal() {
 }
 
 // ─── VPS Logs ───────────────────────────────────────────────
-async function loadVPSLogs() {
-    if (!currentVPSId) return;
+async function loadVPSLogs(vpsId) {
+    const id = vpsId || currentVPSId;
+    if (!id) return;
     const type = document.getElementById('logType').value;
     const tail = document.getElementById('logTail').value;
     document.getElementById('logViewer').textContent = 'Loading...';
     try {
-        const logs = await api('GET', `/vps/${currentVPSId}/logs?log_type=${type}&tail=${tail}`);
+        const logs = await api('GET', `/vps/${id}/logs?log_type=${type}&tail=${tail}`);
         document.getElementById('logViewer').textContent = logs;
+        if (__alpine) __alpine.detailLogs = logs;
     } catch (err) {
         document.getElementById('logViewer').textContent = 'Error: ' + err.message;
+        if (__alpine) __alpine.detailLogs = 'Error: ' + err.message;
     }
 }
 
@@ -2176,6 +2488,7 @@ async function runQuickCmd(cmd) {
     if (!cmd) return;
     document.getElementById('quickCmdInput').value = cmd;
     document.getElementById('quickCmdOutput').textContent = `$ ${cmd}\nRunning...`;
+    if (__alpine) __alpine.detailQuickCmdOutput = `$ ${cmd}\nRunning...`;
     try {
         const r = await api('POST', `/vps/${currentVPSId}/exec`, { command: cmd });
         let output = `$ ${cmd}\n`;
@@ -2183,8 +2496,11 @@ async function runQuickCmd(cmd) {
         if (r.stderr) output += `\n[STDERR]\n${r.stderr}`;
         if (!r.success && !r.stderr) output += `\nExit code: ${r.exit_code}`;
         document.getElementById('quickCmdOutput').textContent = output;
+        if (__alpine) __alpine.detailQuickCmdOutput = output;
     } catch (err) {
-        document.getElementById('quickCmdOutput').textContent = `Error: ${err.message}`;
+        const msg = `Error: ${err.message}`;
+        document.getElementById('quickCmdOutput').textContent = msg;
+        if (__alpine) __alpine.detailQuickCmdOutput = msg;
     }
 }
 
@@ -2199,46 +2515,7 @@ async function loadUsersList() {
     try {
         const users = await api('GET', '/users');
         usersList = users;
-        const tbody = document.getElementById('usersTableBody');
-        if (!users || users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">No users found.</td></tr>';
-            return;
-        }
-        tbody.innerHTML = users.map(u => {
-            // Add groups cell
-            const groupNames = u.group_names || [];
-            const groupBadges = groupNames.length 
-                ? groupNames.map(n => `<span style="display:inline-flex;align-items:center;gap:2px;padding:2px 6px;border-radius:3px;background:var(--warning);color:#000;font-size:10px;font-weight:600;margin:1px;"><span class="material-icons" style="font-size:10px">folder</span>${escHtml(n)}</span>`).join('')
-                : '<span style="color:var(--text-muted);font-size:12px;">—</span>';
-            return `<tr>
-            <td><strong>${esc(u.username)}</strong></td>
-            <td>${esc(u.display_name || '')}</td>
-            <td><span class="tag">${esc(u.role)}</span></td>
-            <td>${groupBadges}</td>
-            <td>${u.role === 'admin'
-                ? '<span style="color:var(--primary)">Full Access</span>'
-                : (u.vps_access && u.vps_access.length > 0
-                    ? u.vps_access.map(id => {
-                        const vps = (allVPSList.length ? allVPSList : vpsList).find(v => v.id === id);
-                        return `<span class="tag">${esc(vps ? vps.name : id)}</span>`;
-                    }).join(' ')
-                    : '<span style="color:var(--text-muted)">None</span>')}</td>
-            <td>${u.active !== false
-                ? '<span style="color:var(--success)">Active</span>'
-                : '<span style="color:var(--danger)">Disabled</span>'}</td>
-            <td>${u.totp_enabled
-                ? '<span style="color:var(--success)">🔐 Enabled</span>'
-                : '<span style="color:var(--text-muted)">—</span>'}</td>
-            <td class="action-btns">
-                <button class="btn btn-xs" onclick="showEditUserModal('${u.id}')">Edit</button>
-                <button class="btn btn-xs" onclick="showUserVPSAccessModal('${u.id}')" title="VPS Access">VPS Access</button>
-                <button class="btn btn-xs" onclick="showGroupAccessModal('${u.id}','${escHtml(u.username)}')" title="Group Access">
-                    <span class="material-icons" style="font-size:14px">folder</span>
-                </button>
-                ${u.username !== 'admin' ? `<button class="btn btn-xs btn-danger" onclick="deleteUser('${u.id}','${esc(u.username)}')">Delete</button>` : ''}
-            </td>
-        </tr>`;
-        }).join('');
+        if (__alpine) __alpine.usersData = users || [];
     } catch (err) {
         console.error('Users list error:', err);
     }
@@ -2428,49 +2705,7 @@ function copyInviteLink() {
 async function loadSSHKeys() {
     try {
         const keys = await api('GET', '/ssh-keys');
-        const tbody = document.getElementById('sshKeysTableBody');
-        if (!keys.length) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px;">No SSH keys added yet. <a href="#" onclick="showAddSSHKeyModal()">Add your first key</a></td></tr>';
-            return;
-        }
-        tbody.innerHTML = keys.map(k => {
-            const typeBadge = {
-                'file': '<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:var(--primary);color:white;">File</span>',
-                'pasted': '<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:var(--success);color:white;">Pasted</span>',
-                'public_only': '<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:var(--tertiary);color:var(--text);border:1px solid var(--border);">Public</span>',
-                'both': '<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:var(--warning);color:white;">Both</span>',
-            }[k.key_type] || '<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:var(--primary);color:white;">File</span>';
-            return `
-            <tr>
-                <td>
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        <span class="material-icons" style="font-size:18px;color:var(--primary)">vpn_key</span>
-                        <div>
-                            <strong>${escHtml(k.name)}</strong>
-                            <div style="margin-top:2px;">${typeBadge}</div>
-                        </div>
-                    </div>
-                </td>
-                <td><code style="font-size:12px;">${escHtml(k.key_file || '—')}</code></td>
-                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                    <code style="font-size:11px;color:var(--text-muted);">${escHtml(k.public_key || '—')}</code>
-                </td>
-                <td style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
-                    ${escHtml(k.fingerprint || '—')}
-                </td>
-                <td style="font-size:12px;color:var(--text-muted);">${new Date(k.created_at * 1000).toLocaleDateString()}</td>
-                <td>
-                    <div style="display:flex;gap:4px;">
-                        <button class="btn btn-xs" onclick="fetchKeyFingerprint('${k.id}')" title="Get Fingerprint">
-                            <span class="material-icons" style="font-size:14px">fingerprint</span>
-                        </button>
-                        <button class="btn btn-xs" onclick="deleteSSHKey('${k.id}','${escHtml(k.name)}')" title="Delete">
-                            <span class="material-icons" style="font-size:14px;color:var(--danger)">delete</span>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `}).join('');
+        if (__alpine) __alpine.sshKeysData = keys || [];
     } catch (err) {
         console.error('Load SSH keys error:', err);
     }
@@ -2642,51 +2877,7 @@ let allGroups = [];
 async function loadGroups() {
     try {
         allGroups = await api('GET', '/groups');
-        const tbody = document.getElementById('groupsTableBody');
-        if (!allGroups.length) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px;">No groups yet. <a href="#" onclick="showCreateGroupModal()">Create your first group</a></td></tr>';
-            return;
-        }
-        tbody.innerHTML = allGroups.map(g => `
-            <tr>
-                <td>
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        <span class="material-icons" style="font-size:18px;color:var(--warning)">folder</span>
-                        <strong>${escHtml(g.name)}</strong>
-                    </div>
-                </td>
-                <td style="color:var(--text-muted);font-size:13px;">${escHtml(g.description || '—')}</td>
-                <td>
-                    <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;background:var(--primary);color:white;font-size:12px;font-weight:500;">
-                        <span class="material-icons" style="font-size:13px">dns</span> ${g.vps_count}
-                    </span>
-                </td>
-                <td>
-                    <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;background:var(--tertiary);color:var(--text);font-size:12px;">
-                        <span class="material-icons" style="font-size:13px">people</span> ${g.member_count}
-                    </span>
-                </td>
-                <td>
-                    <div style="display:flex;gap:4px;">
-                        <button class="btn btn-xs btn-primary" onclick="showAddVPSToGroup('${g.id}','${escHtml(g.name)}')" title="Add VPS">
-                            <span class="material-icons" style="font-size:14px">add</span>
-                        </button>
-                        <button class="btn btn-xs" onclick="showRemoveVPSFromGroup('${g.id}','${escHtml(g.name)}')" title="Remove VPS" ${g.vps_count === 0 ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>
-                            <span class="material-icons" style="font-size:14px;color:var(--warning)">remove</span>
-                        </button>
-                        <button class="btn btn-xs" onclick="viewGroupDetail('${g.id}')" title="View Details">
-                            <span class="material-icons" style="font-size:14px">visibility</span>
-                        </button>
-                        <button class="btn btn-xs" onclick="editGroup('${g.id}')" title="Edit">
-                            <span class="material-icons" style="font-size:14px">edit</span>
-                        </button>
-                        <button class="btn btn-xs" onclick="deleteGroup('${g.id}','${escHtml(g.name)}')" title="Delete">
-                            <span class="material-icons" style="font-size:14px;color:var(--danger)">delete</span>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `).join('');
+        if (__alpine) __alpine.groupsData = allGroups || [];
     } catch (err) {
         console.error('Load groups error:', err);
     }
@@ -3108,9 +3299,6 @@ async function loadAuditLogs() {
     if (filter) url += `&action=${encodeURIComponent(filter)}`;
     if (userFilter) url += `&user=${encodeURIComponent(userFilter)}`;
 
-    const tbody = document.getElementById('auditTableBody');
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>';
-
     try {
         const data = await api('GET', url);
         const countEl = document.getElementById('auditTotalCount');
@@ -3126,26 +3314,16 @@ async function loadAuditLogs() {
         if (prevBtn) prevBtn.style.display = auditPageOffset > 0 ? 'inline-flex' : 'none';
         if (nextBtn) nextBtn.style.display = (auditPageOffset + AUDIT_PAGE_SIZE) < data.total ? 'inline-flex' : 'none';
 
-        if (!data.logs || data.logs.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted)">No audit logs found.</td></tr>';
-            return;
+        if (__alpine) {
+            __alpine.auditData = data.logs || [];
+            __alpine.auditTotal = data.total || 0;
+            __alpine.auditPage = currentPage;
         }
-
-        tbody.innerHTML = data.logs.map(log => {
-            const ts = log.timestamp ? new Date(log.timestamp).toLocaleString() : '-';
-            const detailsFormatted = log.details ? Object.entries(log.details).map(([k,v]) => `${k}: ${v}`).join(' · ') : '';
-            const resourceStr = log.resource_type ? `${esc(log.resource_type)}${log.resource_name ? ': ' + esc(log.resource_name) : (log.resource_id ? ': ' + esc(log.resource_id.substring(0, 8)) : '')}` : '-';
-            return `<tr>
-                <td style="white-space:nowrap;font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">${esc(ts)}</td>
-                <td><strong>${esc(log.username)}</strong></td>
-                <td>${formatAuditAction(log.action)}</td>
-                <td>${resourceStr}</td>
-                <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;font-size:12px;color:var(--primary)" onclick="showAuditDetail(this)" data-log='${esc(JSON.stringify(log))}'>${esc(detailsFormatted)}</td>
-                <td style="font-size:12px;color:var(--text-muted)">${esc(log.ip_address || '-')}</td>
-            </tr>`;
-        }).join('');
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--danger)">Error: ${esc(err.message)}</td></tr>`;
+        if (__alpine) {
+            __alpine.auditData = [];
+        }
+        showToast('Failed to load audit logs: ' + err.message, 'error');
     }
 }
 
@@ -3385,8 +3563,10 @@ async function loadGitHubActions() {
         renderGitHubActions(data);
     } catch (err) {
         console.error('GitHub actions error:', err);
-        document.getElementById('ghWorkflowRuns').innerHTML =
-            `<div class="empty-state"><span class="material-icons empty-icon" style="color:var(--danger);">error</span><p style="color:var(--danger);">Failed to load workflow runs: ${escHtml(err.message)}</p></div>`;
+        if (__alpine) {
+            __alpine.githubWorkflows = [];
+            __alpine.githubStats = { totalRepos: 0, successCount: 0, failedCount: 0, runningCount: 0 };
+        }
     }
 }
 
@@ -3405,101 +3585,22 @@ function renderGitHubActions(data) {
         });
     });
 
-    document.getElementById('ghTotalRepos').textContent = repos.length;
-    document.getElementById('ghSuccessCount').textContent = successCount;
-    document.getElementById('ghFailedCount').textContent = failedCount;
-    document.getElementById('ghRunningCount').textContent = runningCount;
-
-    const container = document.getElementById('ghWorkflowRuns');
-    if (repos.length === 0) {
-        container.innerHTML = `<div class="empty-state">
-            <span class="material-icons empty-icon" style="font-size:48px;color:var(--text-muted);">rocket_launch</span>
-            <p style="color:var(--text-muted);">Add a token and repository to see workflow runs.</p>
-        </div>`;
-        return;
+    if (__alpine) {
+        __alpine.githubStats = {
+            totalRepos: repos.length,
+            successCount,
+            failedCount,
+            runningCount,
+        };
+        __alpine.githubWorkflows = repos;
     }
-
-    let html = '';
-    for (const repo of repos) {
-        if (repo.error) {
-            html += `<div style="background:var(--card);border-radius:8px;padding:16px;margin-bottom:12px;border:1px solid var(--border);border-left:3px solid #EF4444;">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                    <span class="material-icons" style="font-size:18px;">source</span>
-                    <strong style="font-family:'JetBrains Mono',monospace;font-size:14px;">${escHtml(repo.repo)}</strong>
-                    ${repo.branch ? `<span class="tag">${escHtml(repo.branch)}</span>` : ''}
-                </div>
-                <div style="color:var(--danger);font-size:13px;">⚠ ${escHtml(repo.error)}</div>
-            </div>`;
-            continue;
-        }
-
-        const runs = repo.runs || [];
-        const lastRun = runs[0];
-        let borderColor = '#6B7280';
-        if (lastRun) borderColor = getStatusColor(lastRun.status, lastRun.conclusion);
-
-        html += `<div style="background:var(--card);border-radius:8px;padding:16px;margin-bottom:12px;border:1px solid var(--border);border-left:3px solid ${borderColor};">`;
-        html += `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-                <span class="material-icons" style="font-size:18px;">source</span>
-                <strong style="font-family:'JetBrains Mono',monospace;font-size:14px;">
-                    <a href="https://github.com/${escHtml(repo.repo)}" target="_blank" style="color:var(--text);text-decoration:none;">${escHtml(repo.repo)}</a>
-                </strong>
-                ${repo.branch ? `<span class="tag">${escHtml(repo.branch)}</span>` : ''}
-            </div>
-            <span style="font-size:12px;color:var(--text-muted);">${runs.length} run${runs.length !== 1 ? 's' : ''}</span>
-        </div>`;
-
-        if (runs.length === 0) {
-            html += `<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:12px;">No recent workflow runs found.</div>`;
-        } else {
-            for (const run of runs) {
-                const icon = getStatusIcon(run.status, run.conclusion);
-                const color = getStatusColor(run.status, run.conclusion);
-                const msg = run.commit_message ? (run.commit_message.length > 60 ? run.commit_message.substring(0, 60) + '…' : run.commit_message) : '';
-                html += `<a href="${escHtml(run.html_url || '#')}" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:6px;margin-bottom:4px;text-decoration:none;color:var(--text);background:var(--secondary);transition:background 0.15s;" onmouseover="this.style.background='var(--tertiary)'" onmouseout="this.style.background='var(--secondary)'">
-                    <span style="font-size:16px;">${icon}</span>
-                    <div style="flex:1;min-width:0;">
-                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                            <span style="font-weight:500;font-size:13px;">${escHtml(run.name || 'Workflow')}</span>
-                            <span class="tag" style="font-size:11px;background:${color}20;color:${color};border-color:${color}40;">${escHtml(run.branch || '')}</span>
-                            ${run.commit ? `<code style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">${escHtml(run.commit)}</code>` : ''}
-                        </div>
-                        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                            ${msg ? `${escHtml(msg)} · ` : ''}${escHtml(run.actor || '')} · ${timeAgo(run.started_at)}
-                        </div>
-                    </div>
-                    <span class="material-icons" style="font-size:16px;color:var(--text-muted);">open_in_new</span>
-                </a>`;
-            }
-        }
-        html += `</div>`;
-    }
-    container.innerHTML = html;
 }
 
 async function loadGitHubTokens() {
     try {
         const tokens = await api('GET', '/github/tokens');
         _ghTokensCache = tokens;
-        const tbody = document.getElementById('ghTokensTableBody');
-        if (tokens.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px;">No tokens added</td></tr>';
-            return;
-        }
-        tbody.innerHTML = tokens.map(t => `<tr>
-            <td><strong>${escHtml(t.name)}</strong></td>
-            <td><code style="font-family:'JetBrains Mono',monospace;font-size:12px;">${escHtml(t.token_masked)}</code></td>
-            <td>${escHtml(t.github_user || '-')}</td>
-            <td class="action-btns">
-                <button class="btn btn-xs" onclick="testToken('${escHtml(t.id)}')" title="Test token">
-                    <span class="material-icons" style="font-size:14px;">check_circle</span>
-                </button>
-                <button class="btn btn-xs btn-danger" onclick="deleteToken('${escHtml(t.id)}','${escHtml(t.name)}')">
-                    <span class="material-icons" style="font-size:14px;">delete</span>
-                </button>
-            </td>
-        </tr>`).join('');
+        if (__alpine) __alpine.githubTokens = tokens || [];
     } catch (err) {
         console.error('Load tokens error:', err);
     }
@@ -3508,24 +3609,7 @@ async function loadGitHubTokens() {
 async function loadGitHubRepos() {
     try {
         const repos = await api('GET', '/github/repos');
-        const tbody = document.getElementById('ghReposTableBody');
-        if (repos.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px;">No repos tracked</td></tr>';
-            return;
-        }
-        tbody.innerHTML = repos.map(r => `<tr>
-            <td>${r.is_public ? '<span style="color:var(--accent);font-weight:600;">🌐 Public</span>' : escHtml(r.token_name)}</td>
-            <td><code style="font-family:'JetBrains Mono',monospace;">${escHtml(r.full_name)}</code></td>
-            <td>${r.branch ? `<span class="tag">${escHtml(r.branch)}</span>` : '<span style="color:var(--text-muted);">All</span>'}</td>
-            <td class="action-btns">
-                <button class="btn btn-xs" style="background:var(--tertiary);color:var(--text);border:1px solid var(--border);" onclick="showEditRepoModal('${escHtml(r.id)}','${escHtml(r.full_name)}','${escHtml(r.branch || '')}',${r.is_public ? 'true' : 'false'},'${escHtml(r.token_id || '')}')" title="Edit branch">
-                    <span class="material-icons" style="font-size:14px;">edit</span>
-                </button>
-                <button class="btn btn-xs btn-danger" onclick="deleteRepo('${escHtml(r.id)}','${escHtml(r.full_name)}')" title="Remove repo">
-                    <span class="material-icons" style="font-size:14px;">delete</span>
-                </button>
-            </td>
-        </tr>`).join('');
+        if (__alpine) __alpine.githubRepos = repos || [];
     } catch (err) {
         console.error('Load repos error:', err);
     }
@@ -4052,35 +4136,38 @@ function timeAgo(timestamp) {
 async function loadScripts() {
     try {
         const scripts = await api('GET', '/scripts');
-        renderScriptCards(scripts);
+        if (__alpine) __alpine.scriptsData = scripts || [];
 
         // Load stats from /api/scripts/stats
         try {
             const stats = await api('GET', '/scripts/stats');
-            document.getElementById('statTotalScripts').textContent = stats.total_scripts || 0;
-            document.getElementById('statTotalRuns').textContent = stats.total_runs || 0;
-            document.getElementById('statPinned').textContent = stats.pinned_count || 0;
-            const rateEl = document.getElementById('statSuccessRate');
-            rateEl.textContent = stats.total_runs > 0 ? stats.success_rate + '%' : '—';
-            rateEl.style.color = stats.success_rate >= 80 ? 'var(--success)' : stats.success_rate >= 50 ? 'var(--warning)' : 'var(--danger)';
-            const durEl = document.getElementById('statAvgDuration');
-            durEl.textContent = stats.avg_duration_ms ? formatDuration(stats.avg_duration_ms) : '—';
-            // Category breakdown
-            const catStatEl = document.getElementById('scriptStats');
-            if (catStatEl) {
+            if (__alpine) {
                 const categories = stats.categories || {};
                 const entries = Object.entries(categories);
-                catStatEl.innerHTML = entries.length > 0
-                    ? entries.map(([cat, count]) =>
+                let catHtml = '';
+                if (entries.length > 0) {
+                    catHtml = entries.map(([cat, count]) =>
                         `<div style="display:flex;justify-content:space-between;gap:8px;">
                             <span>${esc(cat)}</span>
                             <strong>${count}</strong>
                         </div>`
-                      ).join('')
-                    : (stats.total_scripts > 0 ? '<span style="color:var(--text-muted)">Uncategorized</span>' : '<span style="color:var(--text-muted)">No scripts</span>');
+                    ).join('');
+                } else {
+                    catHtml = stats.total_scripts > 0 ? '<span style="color:var(--text-muted)">Uncategorized</span>' : '<span style="color:var(--text-muted)">No scripts</span>';
+                }
+                // Update the category breakdown div directly since it uses a nested template
+                const catStatEl = document.getElementById('scriptStats');
+                if (catStatEl) catStatEl.innerHTML = catHtml;
+
+                __alpine.scriptStats = {
+                    totalScripts: stats.total_scripts || 0,
+                    totalRuns: stats.total_runs || 0,
+                    successRate: stats.total_runs > 0 ? stats.success_rate + '%' : '—',
+                    avgDuration: stats.avg_duration_ms ? formatDuration(stats.avg_duration_ms) : '—',
+                    pinned: stats.pinned_count || 0,
+                    categories: stats.categories || {},
+                };
             }
-            // Show "Seed Templates" button when no scripts exist
-            const seedBtn = document.getElementById('seedTemplatesBtn') || createSeedBtn();
         } catch (e) {
             // Stats endpoint not available
         }
@@ -4142,7 +4229,7 @@ async function populateFilterCategories() {
 async function loadScriptRuns() {
     try {
         const runs = await api('GET', '/scripts/runs?limit=20');
-        renderScriptRuns(runs);
+        if (__alpine) __alpine.scriptRuns = runs || [];
     } catch (err) {
         console.error('loadScriptRuns error:', err);
         showToast('Failed to load script runs: ' + err.message, 'error');
@@ -5337,30 +5424,19 @@ async function runPortCheck(vpsId) {
 // ─── Settings ──────────────────────────────────────────────
 
 async function loadSettings() {
-    // Load user info
     try {
         const r = await api('GET', '/auth/me');
-        const usernameEl = document.getElementById('settingsUsername');
-        const roleEl = document.getElementById('settingsRole');
-        const displayNameEl = document.getElementById('settingsDisplayName');
-        if (usernameEl) usernameEl.textContent = r.username || '-';
-        if (roleEl) {
-            const roleLabels = { admin: '🛡️ Admin', operator: '🔧 Operator', viewer: '👁️ Viewer' };
-            roleEl.textContent = roleLabels[r.role] || r.role || '-';
-        }
-        if (displayNameEl) displayNameEl.textContent = r.display_name || r.username || '-';
-
-        // Also show VPS access count
-        const vpsCountEl = document.getElementById('settingsVpsCount');
-        if (vpsCountEl && r.accessible_vps) {
-            vpsCountEl.textContent = `${r.accessible_vps.length} instance(s)`;
-        }
-        // Show group memberships
-        const groupsEl = document.getElementById('settingsGroups');
-        if (groupsEl) {
-            groupsEl.textContent = (r.group_names && r.group_names.length > 0)
-                ? r.group_names.join(', ')
-                : 'None';
+        // Update Alpine currentUser directly
+        if (__alpine) {
+            __alpine.currentUser = {
+                id: r.id,
+                username: r.username,
+                role: r.role,
+                display_name: r.display_name,
+                vps_access: r.vps_access || [],
+                group_names: r.group_names || [],
+                accessible_vps: r.accessible_vps || [],
+            };
         }
         // Show account creation date
         const createdEl = document.getElementById('settingsCreatedAt');
@@ -5376,37 +5452,43 @@ async function loadSettings() {
 }
 
 async function checkTotpStatus() {
-    const statusEl = document.getElementById('totpStatus');
-    if (!statusEl) return;
     try {
         const r = await api('GET', '/auth/totp/status');
-        if (r.enabled) {
-            statusEl.innerHTML = `
-                <div style="display:flex;align-items:center;gap:12px;padding:16px;background:var(--card);border-radius:8px;border:1px solid var(--border);">
-                    <span class="material-icons" style="font-size:32px;color:var(--success)">verified_user</span>
-                    <div>
-                        <div style="font-weight:600;color:var(--success)">Two-Factor Authentication is enabled</div>
-                        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Account is protected with TOTP 2FA.</div>
-                    </div>
-                    <button class="btn btn-danger" onclick="disableTotp()" style="margin-left:auto;">
-                        <span class="material-icons" style="font-size:16px">lock_open</span> Disable 2FA
-                    </button>
-                </div>`;
-        } else {
-            statusEl.innerHTML = `
-                <div style="display:flex;align-items:center;gap:12px;padding:16px;background:var(--card);border-radius:8px;border:1px solid var(--border);">
-                    <span class="material-icons" style="font-size:32px;color:var(--text-muted)">lock_open</span>
-                    <div>
-                        <div style="font-weight:600;">Two-Factor Authentication is disabled</div>
-                        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Enhance your account security by enabling 2FA.</div>
-                    </div>
-                    <button class="btn btn-primary" onclick="setupTotp()" style="margin-left:auto;">
-                        <span class="material-icons" style="font-size:16px">security</span> Setup 2FA
-                    </button>
-                </div>`;
+        if (__alpine) {
+            if (r.enabled) {
+                __alpine.totpStatus = `
+                    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                        <div style="display:flex;align-items:center;gap:12px;padding:16px;background:var(--card);border-radius:8px;border:1px solid var(--border);flex:1;">
+                            <span class="material-icons" style="font-size:32px;color:var(--success)">verified_user</span>
+                            <div>
+                                <div style="font-weight:600;color:var(--success)">Two-Factor Authentication is enabled</div>
+                                <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Account is protected with TOTP 2FA.</div>
+                            </div>
+                            <button class="btn btn-danger" onclick="disableTotp()" style="margin-left:auto;">
+                                <span class="material-icons" style="font-size:16px">lock_open</span> Disable 2FA
+                            </button>
+                        </div>
+                    </div>`;
+            } else {
+                __alpine.totpStatus = `
+                    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                        <div style="display:flex;align-items:center;gap:12px;padding:16px;background:var(--card);border-radius:8px;border:1px solid var(--border);flex:1;">
+                            <span class="material-icons" style="font-size:32px;color:var(--text-muted)">lock_open</span>
+                            <div>
+                                <div style="font-weight:600;">Two-Factor Authentication is disabled</div>
+                                <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Enhance your account security by enabling 2FA.</div>
+                            </div>
+                            <button class="btn btn-primary" onclick="setupTotp()" style="margin-left:auto;">
+                                <span class="material-icons" style="font-size:16px">security</span> Setup 2FA
+                            </button>
+                        </div>
+                    </div>`;
+            }
         }
     } catch (err) {
-        statusEl.innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
+        if (__alpine) {
+            __alpine.totpStatus = `<div class="error-msg">${esc(err.message)}</div>`;
+        }
     }
 }
 
