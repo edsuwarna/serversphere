@@ -72,7 +72,7 @@
                     <circle cx="18.5" cy="22" r="1.5" fill="var(--emerald-400)"/>
                 </svg>
                 <span class="brand-text">ServerSphere</span>
-                <span class="brand-version">v0.1.0</span>
+                <span class="brand-version" id="brandVersion">v0.1.0</span>
             </div>
 
             <nav class="sidebar-nav">
@@ -84,6 +84,18 @@
                 <a href="#" class="nav-item" data-page="vps-list" onclick="showPage('vps-list')">
                     <span class="material-icons nav-icon">dns</span>
                     <span class="nav-label">Instances</span>
+                </a>
+                <a href="#" class="nav-item" data-page="compose" onclick="showPage('compose')">
+                    <span class="material-icons nav-icon">layers</span>
+                    <span class="nav-label">Docker Compose</span>
+                </a>
+                <a href="#" class="nav-item" data-page="cron" onclick="showPage('cron')">
+                    <span class="material-icons nav-icon">schedule</span>
+                    <span class="nav-label">Cron Jobs</span>
+                </a>
+                <a href="#" class="nav-item" data-page="network" onclick="showPage('network')">
+                    <span class="material-icons nav-icon">wifi</span>
+                    <span class="nav-label">Network Tools</span>
                 </a>
                 <a href="#" id="navMonitoring" class="nav-item" data-page="monitoring" onclick="showPage('monitoring')" style="display:none">
                     <span class="material-icons nav-icon">monitoring</span>
@@ -123,6 +135,10 @@
                     <span class="material-icons nav-icon">code</span>
                     <span class="nav-label">Scripts</span>
                 </a>
+                <a href="#" class="nav-item" data-page="settings" onclick="showPage('settings')">
+                    <span class="material-icons nav-icon">settings</span>
+                    <span class="nav-label">Settings</span>
+                </a>
             </nav>
 
             <div class="sidebar-footer">
@@ -131,7 +147,7 @@
                     <span class="nav-label">Add Instance</span>
                 </a>
                 <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-light)">
-                    <div class="version">ServerSphere v0.1.0</div>
+                    <div class="version" id="pageVersion">ServerSphere v0.1.0</div>
                 </div>
             </div>
         </aside>
@@ -159,9 +175,19 @@
                     <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme" id="themeToggleBtn">
                         <span class="material-icons" id="themeIcon">dark_mode</span>
                     </button>
-                    <div class="user-menu" onclick="document.getElementById('userMenuDropdown').classList.toggle('hidden')">
+                    <div class="user-menu" onclick="document.getElementById('userMenuDropdown').classList.toggle('hidden')" style="position:relative;">
                         <div class="user-avatar" id="userAvatarInitials">ES</div>
                         <span id="userDisplay" class="user-name"></span>
+                        <div id="userMenuDropdown" class="hidden" style="position:absolute;top:100%;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:180px;z-index:1000;padding:8px 0;">
+                            <div style="padding:8px 16px;font-size:12px;color:var(--text-muted);" id="userMenuEmail"></div>
+                            <hr style="border:none;border-top:1px solid var(--border);margin:4px 0;">
+                            <div onclick="event.stopPropagation();showPage('settings')" style="padding:8px 16px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;" onmouseover="this.style.background='var(--tertiary)'" onmouseout="this.style.background='transparent'">
+                                <span class="material-icons" style="font-size:16px">settings</span> Settings
+                            </div>
+                            <div onclick="event.stopPropagation();logout()" style="padding:8px 16px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--danger);" onmouseover="this.style.background='var(--tertiary)'" onmouseout="this.style.background='transparent'">
+                                <span class="material-icons" style="font-size:16px">logout</span> Logout
+                            </div>
+                        </div>
                     </div>
                     <button class="btn btn-ghost btn-sm" onclick="logout()">
                         <span class="material-icons" style="font-size:18px">logout</span>
@@ -216,24 +242,9 @@
                             <span class="material-icons" style="font-size:18px">add</span> Add Instance
                         </button>
                     </div>
-                    <div class="table-wrapper">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th style="width:36px;"><input type="checkbox" id="selectAllVPS" onchange="toggleSelectAllVPS(this)" title="Select all"></th>
-                                <th>Status</th>
-                                <th>Name</th>
-                                <th>Host</th>
-                                <th>User</th>
-                                <th>Group</th>
-                                <th>Tags</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="vpsTableBody">
-                        </tbody>
-                    </table>
-                </div>
+                    <div class="vps-card-grid" id="vpsCardGrid">
+                        <!-- VPS cards rendered dynamically by JS -->
+                    </div>
 
                 <!-- ═══ Bulk Action Bar ═══ -->
                 <div id="bulkActionBar" class="bulk-action-bar hidden">
@@ -243,6 +254,9 @@
                             <button class="btn btn-primary btn-sm" onclick="showBulkCommandModal()">
                                 <span class="material-icons" style="font-size:16px">terminal</span> Run Command
                             </button>
+                            <button class="btn btn-danger btn-sm" onclick="bulkDeleteVPS()" id="bulkDeleteBtn">
+                                <span class="material-icons" style="font-size:16px">delete</span> Delete
+                            </button>
                             <div class="bulk-quick-actions">
                                 <button class="btn btn-sm" onclick="bulkQuickAction('ping -c 3 google.com')" title="Ping test">
                                     📡 Ping
@@ -250,7 +264,7 @@
                                 <button class="btn btn-sm" onclick="bulkQuickAction('uptime')" title="System uptime">
                                     ⏱ Uptime
                                 </button>
-                                <button class="btn btn-sm" onclick='bulkQuickAction("docker ps --format \"table {{.Names}}\t{{.Status}}\t{{.Image}}\"')' title="Docker containers">
+                                <button class="btn btn-sm" onclick='bulkQuickAction(`docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"`)' title="Docker containers">
                                     🐳 Docker PS
                                 </button>
                                 <button class="btn btn-sm" onclick="bulkQuickAction('df -h /')" title="Disk usage">
@@ -291,6 +305,7 @@
                                     <th>Groups</th>
                                     <th>VPS Access</th>
                                     <th>Status</th>
+                                    <th>2FA</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -322,6 +337,9 @@
                             <option value="user_create">User Create</option>
                             <option value="user_update">User Update</option>
                             <option value="user_delete">User Delete</option>
+                            <option value="user_vps_access_update">User VPS Access</option>
+                            <option value="user_group_update">User Group Access</option>
+                            <option value="invite_generated">Invite Generated</option>
                             <option value="exec_command">Exec Command</option>
                             <option value="terminal_connect">Terminal Connect</option>
                             <option value="bulk_command">Bulk Command</option>
@@ -330,10 +348,33 @@
                             <option value="group_create">Group Create</option>
                             <option value="group_update">Group Update</option>
                             <option value="group_delete">Group Delete</option>
+                            <option value="compose_up">Compose Up</option>
+                            <option value="compose_down">Compose Down</option>
+                            <option value="compose_restart">Compose Restart</option>
+                            <option value="crontab_update">Crontab Update</option>
+                            <option value="cronjob_create">Cron Job Create</option>
+                            <option value="script_create">Script Create</option>
+                            <option value="script_run">Script Run</option>
+                            <option value="script_update">Script Update</option>
+                            <option value="script_delete">Script Delete</option>
+                            <option value="github_token_create">GitHub Token</option>
+                            <option value="github_repo_add">GitHub Repo</option>
+                            <option value="totp_setup_started">TOTP Setup</option>
+                            <option value="totp_disabled">TOTP Disable</option>
+                            <option value="oidc_error">OIDC Error</option>
                         </select>
                         <input type="text" id="auditUserFilter" placeholder="Filter by user..." oninput="debounceAuditFilter()"
                             style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text);font-size:13px;width:200px;">
                         <span id="auditTotalCount" style="font-size:12px;color:var(--text-muted);"></span>
+                    </div>
+                    <div class="audit-pagination" style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+                        <button class="btn btn-xs" id="auditPrevBtn" onclick="prevAuditPage()" style="display:none">
+                            <span class="material-icons" style="font-size:14px">chevron_left</span> Previous
+                        </button>
+                        <span id="auditPageInfo" style="font-size:12px;color:var(--text-muted);"></span>
+                        <button class="btn btn-xs" id="auditNextBtn" onclick="nextAuditPage()">
+                            Next <span class="material-icons" style="font-size:14px">chevron_right</span>
+                        </button>
                     </div>
                     <div class="table-wrapper">
                         <table class="data-table">
@@ -815,11 +856,17 @@
                         </select>
                         <select id="scriptSortFilter" onchange="filterScripts()"
                             style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--tertiary);color:var(--text);font-size:13px;min-width:140px;">
+                            <option value="name">Name (A-Z)</option>
                             <option value="newest">Newest First</option>
                             <option value="oldest">Oldest First</option>
-                            <option value="name">Name</option>
                             <option value="runs">Most Runs</option>
                         </select>
+                    </div>
+
+                    <!-- Favorites Tab -->
+                    <div style="display:flex;gap:12px;margin-bottom:12px;">
+                        <button class="tab active" data-tab="all" onclick="setScriptTab('all')">📋 All</button>
+                        <button class="tab" data-tab="favorites" onclick="setScriptTab('favorites')">⭐ Favorites</button>
                     </div>
 
                     <!-- Card Grid -->
@@ -840,11 +887,12 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
+                                    <th>Status</th>
                                     <th>Script</th>
                                     <th>VPS</th>
-                                    <th>Status</th>
-                                    <th>Started</th>
                                     <th>Duration</th>
+                                    <th>Started</th>
+                                    <th>Triggered By</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -855,6 +903,301 @@
                     </div>
                 </div>
 
+
+                <!-- ═══ Docker Compose Page ═══ -->
+                <div id="page-compose" class="page">
+                    <div class="page-header">
+                        <h2>Docker Compose</h2>
+                        <button class="btn btn-primary" onclick="refreshCompose()">
+                            <span class="material-icons" style="font-size:16px">refresh</span> Refresh
+                        </button>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:16px;max-width:320px;">
+                        <label for="composeVpsSelect">VPS Instance</label>
+                        <select id="composeVpsSelect">
+                            <option value="">-- Select VPS --</option>
+                        </select>
+                    </div>
+
+                    <!-- Compose Files List -->
+                    <div id="composeFilesList" style="margin-bottom:20px;">
+                        <div class="empty-state" id="composeEmptyState">
+                            <span class="material-icons empty-icon" style="font-size:48px;color:var(--text-muted)">layers</span>
+                            <p style="color:var(--text-muted);">Select a VPS to view Docker Compose files.</p>
+                        </div>
+                        <h4 id="composeFilesHeading" style="margin:0 0 12px;font-size:14px;font-weight:600;display:none;">Compose Files</h4>
+                        <div id="composeFilesContainer" style="display:flex;flex-direction:column;gap:0;">
+                            <!-- Compose file cards and their services panels rendered dynamically by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ Cron Jobs Page ═══ -->
+                <div id="page-cron" class="page">
+                    <div class="page-header">
+                        <h2>Cron Jobs</h2>
+                        <div style="display:flex;gap:8px;">
+                            <button class="btn btn-primary" onclick="refreshCronJobs()">
+                                <span class="material-icons" style="font-size:16px">refresh</span> Refresh
+                            </button>
+                            <button class="btn btn-primary" onclick="showCronEditModal(null)">
+                                <span class="material-icons" style="font-size:18px">add</span> Add Cron Job
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:16px;max-width:320px;">
+                        <label for="cronVpsSelect">VPS Instance</label>
+                        <select id="cronVpsSelect">
+                            <option value="">-- Select VPS --</option>
+                        </select>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="tabs" style="margin-bottom:16px;">
+                        <button class="tab active" data-tab="vps-crontab" onclick="switchCronTab('vps-crontab')">
+                            <span class="material-icons" style="font-size:16px;margin-right:4px">schedule</span> VPS Crontab
+                        </button>
+                        <button class="tab" data-tab="stored-jobs" onclick="switchCronTab('stored-jobs')">
+                            <span class="material-icons" style="font-size:16px;margin-right:4px">storage</span> Stored Jobs
+                        </button>
+                    </div>
+
+                    <!-- VPS Crontab Tab -->
+                    <div id="cron-tab-vps-crontab" class="tab-content active">
+                        <div class="card">
+                            <div class="card-header">
+                                <span class="material-icons" style="font-size:18px;margin-right:8px">schedule</span>
+                                <h3>System Crontab</h3>
+                            </div>
+                            <div class="card-body">
+                                <textarea id="crontabEditor" rows="12" style="width:100%;padding:10px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;resize:vertical;tab-size:2;" placeholder="# Edit crontab here...&#10;* * * * * /usr/bin/example.sh" readonly></textarea>
+                                <div style="display:flex;gap:8px;margin-top:12px;">
+                                    <button class="btn btn-primary" id="crontabEditBtn" onclick="editCrontab()">
+                                        <span class="material-icons" style="font-size:16px">edit</span> Edit
+                                    </button>
+                                    <button class="btn btn-primary" id="crontabSaveBtn" onclick="saveCrontabFromEditor()" style="display:none;">
+                                        <span class="material-icons" style="font-size:16px">save</span> Save
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stored Jobs Tab -->
+                    <div id="cron-tab-stored-jobs" class="tab-content" style="display:none;">
+                        <div id="storedCronJobsContainer">
+                            <div class="empty-state">
+                                <span class="material-icons empty-icon" style="font-size:48px;color:var(--text-muted)">storage</span>
+                                <p style="color:var(--text-muted);">No stored jobs. Click "Add Cron Job" to create one.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ Network Tools Page ═══ -->
+                <div id="page-network" class="page">
+                    <div class="page-header">
+                        <h2>Network Tools</h2>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:16px;max-width:320px;">
+                        <label for="networkVpsSelect">VPS Instance</label>
+                        <select id="networkVpsSelect">
+                            <option value="">-- Select VPS --</option>
+                        </select>
+                        <small style="color:var(--text-muted);font-size:11px;margin-top:4px;display:block;">
+                            Select a VPS first — all network tools run via SSH on the chosen instance
+                        </small>
+                    </div>
+
+                    <!-- Ping Tool -->
+                    <div class="card" style="margin-bottom:12px;">
+                        <div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleCollapsible('networkPingBody')">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span class="material-icons" style="font-size:18px;color:var(--text-muted)">cell_tower</span>
+                                <span style="font-weight:500;">Ping</span>
+                            </div>
+                            <span class="material-icons" id="networkPingIcon" style="font-size:20px;color:var(--text-muted);transition:transform 0.2s;">expand_more</span>
+                        </div>
+                        <div id="networkPingBody" style="padding:0 16px 16px;display:block;">
+                            <div class="form-row" style="gap:8px;">
+                                <div class="form-group" style="flex:1;">
+                                    <label>Target</label>
+                                    <input type="text" id="pingTarget" placeholder="google.com or 8.8.8.8">
+                                </div>
+                                <div class="form-group" style="width:100px;">
+                                    <label>Count</label>
+                                    <select id="pingCount">
+                                        <option value="1">1</option>
+                                        <option value="3" selected>3</option>
+                                        <option value="5">5</option>
+                                        <option value="10">10</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" onclick="runPing(currentNetworkVpsId)">
+                                <span class="material-icons" style="font-size:16px">play_arrow</span> Run Ping
+                            </button>
+                            <pre id="pingResult" class="code-block" style="margin-top:12px;max-height:200px;overflow-y:auto;display:none;"></pre>
+                        </div>
+                    </div>
+
+                    <!-- Traceroute Tool -->
+                    <div class="card" style="margin-bottom:12px;">
+                        <div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleCollapsible('networkTracerouteBody')">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span class="material-icons" style="font-size:18px;color:var(--text-muted)">alt_route</span>
+                                <span style="font-weight:500;">Traceroute</span>
+                            </div>
+                            <span class="material-icons" id="networkTracerouteIcon" style="font-size:20px;color:var(--text-muted);transition:transform 0.2s;">expand_more</span>
+                        </div>
+                        <div id="networkTracerouteBody" style="padding:0 16px 16px;display:none;">
+                            <div class="form-group">
+                                <label>Target</label>
+                                <input type="text" id="tracerouteTarget" placeholder="google.com or 8.8.8.8">
+                            </div>
+                            <button class="btn btn-primary" onclick="runTraceroute(currentNetworkVpsId)">
+                                <span class="material-icons" style="font-size:16px">play_arrow</span> Run Traceroute
+                            </button>
+                            <pre id="tracerouteResult" class="code-block" style="margin-top:12px;max-height:300px;overflow-y:auto;display:none;"></pre>
+                        </div>
+                    </div>
+
+                    <!-- DNS Lookup Tool -->
+                    <div class="card" style="margin-bottom:12px;">
+                        <div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleCollapsible('networkDnsBody')">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span class="material-icons" style="font-size:18px;color:var(--text-muted)">dns</span>
+                                <span style="font-weight:500;">DNS Lookup</span>
+                            </div>
+                            <span class="material-icons" id="networkDnsIcon" style="font-size:20px;color:var(--text-muted);transition:transform 0.2s;">expand_more</span>
+                        </div>
+                        <div id="networkDnsBody" style="padding:0 16px 16px;display:none;">
+                            <div class="form-row" style="gap:8px;">
+                                <div class="form-group" style="flex:1;">
+                                    <label>Domain</label>
+                                    <input type="text" id="dnsHostname" placeholder="example.com">
+                                </div>
+                                <div class="form-group" style="width:140px;">
+                                    <label>Record Type</label>
+                                    <select id="dnsRecordType">
+                                        <option value="A">A</option>
+                                        <option value="AAAA">AAAA</option>
+                                        <option value="CNAME">CNAME</option>
+                                        <option value="MX">MX</option>
+                                        <option value="TXT">TXT</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" onclick="runDnsLookup(currentNetworkVpsId)">
+                                <span class="material-icons" style="font-size:16px">play_arrow</span> DNS Lookup
+                            </button>
+                            <pre id="dnsResult" class="code-block" style="margin-top:12px;max-height:300px;overflow-y:auto;display:none;"></pre>
+                        </div>
+                    </div>
+
+                    <!-- Port Check Tool -->
+                    <div class="card" style="margin-bottom:12px;">
+                        <div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleCollapsible('networkPortBody')">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span class="material-icons" style="font-size:18px;color:var(--text-muted)">router</span>
+                                <span style="font-weight:500;">Port Check</span>
+                            </div>
+                            <span class="material-icons" id="networkPortIcon" style="font-size:20px;color:var(--text-muted);transition:transform 0.2s;">expand_more</span>
+                        </div>
+                        <div id="networkPortBody" style="padding:0 16px 16px;display:none;">
+                            <div class="form-row" style="gap:8px;">
+                                <div class="form-group" style="flex:1;">
+                                    <label>Target</label>
+                                    <input type="text" id="portCheckHost" placeholder="example.com or 8.8.8.8">
+                                </div>
+                                <div class="form-group" style="width:100px;">
+                                    <label>Port</label>
+                                    <input type="number" id="portCheckPort" placeholder="80" min="1" max="65535">
+                                </div>
+                                <div class="form-group" style="width:100px;">
+                                    <label>Protocol</label>
+                                    <select id="portCheckProtocol">
+                                        <option value="tcp">TCP</option>
+                                        <option value="udp">UDP</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" onclick="runPortCheck(currentNetworkVpsId)">
+                                <span class="material-icons" style="font-size:16px">play_arrow</span> Check
+                            </button>
+                            <div id="portCheckResult" style="margin-top:12px;display:none;padding:12px 16px;border-radius:6px;font-weight:500;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ Settings Page ═══ -->
+                <div id="page-settings" class="page">
+                    <div class="page-header">
+                        <h2>Account Settings</h2>
+                    </div>
+
+                    <!-- TOTP Section -->
+                    <div class="card" style="margin-bottom:16px;">
+                        <div class="card-header">
+                            <span class="material-icons" style="font-size:18px;margin-right:8px">security</span>
+                            <h3>Two-Factor Authentication (TOTP)</h3>
+                        </div>
+                        <div class="card-body">
+                            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                                <div>
+                                    <span style="font-size:13px;color:var(--text-muted);">Status:</span>
+                                    <span id="totpStatus" style="font-weight:600;margin-left:4px;color:var(--text-muted);">Checking...</span>
+                                </div>
+                                <button class="btn btn-primary" id="totpSetupBtn" onclick="setupTotp()" style="display:none;">
+                                    <span class="material-icons" style="font-size:16px">lock</span> Setup TOTP
+                                </button>
+                                <button class="btn btn-danger" id="totpDisableBtn" onclick="disableTotp()" style="display:none;">
+                                    <span class="material-icons" style="font-size:16px">lock_open</span> Disable
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User Info -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="material-icons" style="font-size:18px;margin-right:8px">person</span>
+                            <h3>User Information</h3>
+                        </div>
+                        <div class="card-body">
+                            <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Your account profile details. Contact your administrator to update these fields.</p>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Username</label>
+                                    <span id="settingsUsername" style="font-size:14px;font-weight:500;">-</span>
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Role</label>
+                                    <span id="settingsRole" style="font-size:14px;font-weight:500;">-</span>
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Display Name</label>
+                                    <span id="settingsDisplayName" style="font-size:14px;font-weight:500;">-</span>
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">VPS Access</label>
+                                    <span id="settingsVpsCount" style="font-size:14px;font-weight:500;">-</span>
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Groups</label>
+                                    <span id="settingsGroups" style="font-size:14px;font-weight:500;">-</span>
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Created At</label>
+                                    <span id="settingsCreatedAt" style="font-size:14px;font-weight:500;">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
 </main>
         </div>
@@ -991,7 +1334,6 @@
 
             <!-- Wizard Footer -->
             <div class="modal-footer" style="padding:16px 24px;">
-                <button type="button" class="btn btn-secondary" id="wizardCancelBtn" onclick="closeVPSModal()">Cancel</button>
                 <button type="button" class="btn btn-secondary" id="wizardPrevBtn" onclick="prevAddStep()" style="display:none;">
                     <span class="material-icons" style="font-size:16px">arrow_back</span> Back
                 </button>
@@ -1001,6 +1343,7 @@
                 <button type="button" class="btn btn-primary hidden" id="wizardSaveBtn" onclick="saveVPSFromWizard()">
                     <span class="material-icons" style="font-size:16px">add_circle</span> Add Instance
                 </button>
+                <button type="button" class="btn btn-secondary" id="wizardCancelBtn" onclick="closeVPSModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1079,8 +1422,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save User</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancel</button>
                 </div>
             </form>
         </div>
@@ -1103,8 +1446,8 @@
             <div id="vpsAccessCheckboxes" style="max-height:300px;overflow-y:auto;padding: 0 24px;"></div>
             <p id="vpsAccessGroupNote" style="font-size:11px;color:var(--text-muted);padding:0 24px;margin-top:8px;"></p>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeVPSAccessModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveVPSAccess()">Save Access</button>
+                <button type="button" class="btn btn-secondary" onclick="closeVPSAccessModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1155,10 +1498,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeInviteModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" id="generateInviteBtn" onclick="generateInvite()">
                     <span class="material-icons" style="font-size:16px">link</span> Generate Invite Link
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeInviteModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1198,7 +1541,7 @@
                 <!-- File Path Mode -->
                 <div id="sshKeyFileSection" class="form-group" style="margin-top:12px;">
                     <label>Private Key File Path *</label>
-                    <input type="text" id="sshKeyFile" placeholder="/root/.ssh/id_rsa">
+                    <input type="text" id="sshKeyFile" placeholder="e.g. /root/.ssh/id_rsa">
                     <small style="color:var(--text-muted);font-size:11px;margin-top:4px;display:block;">Path to the private key file on the dashboard server</small>
                 </div>
 
@@ -1216,10 +1559,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeSSHKeyModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveSSHKey()">
                     <span class="material-icons" style="font-size:16px">vpn_key</span> Save Key
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeSSHKeyModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1250,10 +1593,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeGroupModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveGroup()">
                     <span class="material-icons" style="font-size:16px">create_new_folder</span> Save Group
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeGroupModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1295,10 +1638,10 @@
             </p>
             <div id="addVPSToGroupCheckboxes" style="max-height:350px;overflow-y:auto;padding:0 24px;"></div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeAddVPSToGroupModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveVPSToGroup()">
                     <span class="material-icons" style="font-size:16px">save</span> Save
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeAddVPSToGroupModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1319,10 +1662,10 @@
             </p>
             <div id="removeVPSFromGroupCheckboxes" style="max-height:350px;overflow-y:auto;padding:0 24px;"></div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeRemoveVPSFromGroupModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" style="background:var(--warning)" onclick="saveRemoveVPSFromGroup()">
                     <span class="material-icons" style="font-size:16px">remove_circle</span> Remove
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeRemoveVPSFromGroupModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1343,8 +1686,8 @@
             </p>
             <div id="groupAccessCheckboxes" style="max-height:300px;overflow-y:auto;padding: 0 24px;"></div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeGroupAccessModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveGroupAccess()">Save Access</button>
+                <button type="button" class="btn btn-secondary" onclick="closeGroupAccessModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1380,10 +1723,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeAddTokenModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveToken()">
                     <span class="material-icons" style="font-size:16px;">token</span> Save Token
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeAddTokenModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1445,10 +1788,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeAddRepoModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveRepo()">
                     <span class="material-icons" style="font-size:16px;">source</span> Track Repo
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeAddRepoModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1476,10 +1819,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeEditRepoModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveEditRepo()">
                     <span class="material-icons" style="font-size:16px;">save</span> Save
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeEditRepoModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1514,10 +1857,10 @@
                 <div id="bulkVpsList" style="margin-top:12px;padding:8px 10px;background:var(--bg-elevated);border-radius:6px;font-size:12px;color:var(--text-secondary);max-height:100px;overflow-y:auto;font-family:var(--mono);"></div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeBulkCmdModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" id="bulkCmdRunBtn" onclick="executeBulkCommand()">
                     <span class="material-icons" style="font-size:16px">play_arrow</span> Run
                 </button>
+                <button type="button" class="btn btn-secondary" onclick="closeBulkCmdModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1681,7 +2024,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary" onclick="executeScriptRun()">
+                <button type="button" id="scriptRunExecuteBtn" class="btn btn-primary" onclick="executeScriptRun()">
                     <span class="material-icons" style="font-size:16px;">play_arrow</span> Run Script
                 </button>
                 <button type="button" class="btn btn-secondary" onclick="closeScriptRunModal()">Cancel</button>
@@ -1766,6 +2109,146 @@
     <!-- Hidden file input for script import -->
     <input type="file" id="scriptImportInput" accept=".json" style="display:none" onchange="onScriptImportFile(event)">
 
+    <!-- ═══ Script Run Results Modal ═══ -->
+    <div id="scriptRunResultsModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeScriptRunResultsModal()"></div>
+        <div class="modal-card modal-lg" style="max-width:800px;">
+            <div class="modal-header">
+                <h3>Script Execution Results</h3>
+                <button class="modal-close" onclick="closeScriptRunResultsModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div class="modal-body" style="max-height:70vh;overflow-y:auto;padding:16px 24px;">
+                <div id="scriptRunResultsSummary" style="font-size:14px;display:flex;align-items:center;flex-wrap:wrap;gap:4px;"></div>
+                <hr style="border:none;border-top:1px solid var(--border);margin:8px 0;">
+                <div id="scriptRunResultsBody"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ TOTP Setup Modal ═══ -->
+    <div id="totpSetupModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeTotpSetupModal()"></div>
+        <div class="modal-card" style="max-width:420px;">
+            <div class="modal-header">
+                <h3>Setup Two-Factor Authentication</h3>
+                <button class="modal-close" onclick="closeTotpSetupModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div style="padding:16px 24px;text-align:center;">
+                <div style="margin-bottom:16px;">
+                    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Scan this QR code with your authenticator app:</p>
+                    <img id="totpQrCode" src="" alt="TOTP QR Code" style="width:180px;height:180px;border:2px solid var(--border);border-radius:8px;background:#fff;padding:8px;">
+                </div>
+                <div style="margin-bottom:16px;">
+                    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Secret Key</label>
+                    <code id="totpSecret" style="font-size:12px;word-break:break-all;padding:8px;background:var(--tertiary);border-radius:4px;display:inline-block;"></code>
+                </div>
+                <div class="form-group">
+                    <label for="totpVerifyCode">Verification Code</label>
+                    <input type="text" id="totpVerifyCode" placeholder="Enter 6-digit code" maxlength="6" style="text-align:center;font-size:18px;letter-spacing:4px;font-family:var(--mono);">
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content:center;">
+                <button type="button" class="btn btn-primary" onclick="verifyTotpFromModal()">
+                    <span class="material-icons" style="font-size:16px">check_circle</span> Verify
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeTotpSetupModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Compose Action Confirmation Modal ═══ -->
+    <div id="composeActionModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeComposeActionModal()"></div>
+        <div class="modal-card" style="max-width:420px;">
+            <div class="modal-header">
+                <h3>Confirm Compose Action</h3>
+                <button class="modal-close" onclick="closeComposeActionModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div style="padding:16px 24px;text-align:center;">
+                <span class="material-icons" style="font-size:48px;color:var(--warning);margin-bottom:12px;">warning_amber</span>
+                <p id="composeActionMessage" style="font-size:14px;color:var(--text);"></p>
+            </div>
+            <div class="modal-footer" style="justify-content:center;gap:12px;">
+                <button type="button" class="btn btn-primary" id="composeActionConfirmBtn" onclick="confirmComposeAction()">
+                    <span class="material-icons" style="font-size:16px">check</span> Confirm
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeComposeActionModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Cron Job Edit Modal ═══ -->
+    <div id="cronEditModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeCronEditModal()"></div>
+        <div class="modal-card" style="max-width:540px;">
+            <div class="modal-header">
+                <h3 id="cronEditTitle">Add Cron Job</h3>
+                <button class="modal-close" onclick="closeCronEditModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <input type="hidden" id="cronEditId">
+            <div style="padding:16px 24px;">
+                <div class="form-group">
+                    <label for="cronEditName">Name</label>
+                    <input type="text" id="cronEditName" placeholder="e.g. Daily Backup">
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label for="cronEditSchedule">Schedule (Cron Expression)</label>
+                    <input type="text" id="cronEditSchedule" placeholder="*/5 * * * *" style="font-family:var(--mono);">
+                    <small style="color:var(--text-muted);font-size:11px;margin-top:4px;display:block;">Format: minute hour day month weekday</small>
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label for="cronEditCommand">Command</label>
+                    <textarea id="cronEditCommand" rows="4" placeholder="/usr/bin/backup.sh" style="width:100%;padding:10px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;resize:vertical;"></textarea>
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label for="cronEditDescription">Description</label>
+                    <textarea id="cronEditDescription" rows="2" placeholder="Optional description..." style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px;outline:none;resize:vertical;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="saveCronJob()">
+                    <span class="material-icons" style="font-size:16px">save</span> Save
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeCronEditModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ TOTP Login Modal ═══ -->
+    <div id="totpLoginModal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeTotpLoginPrompt()"></div>
+        <div class="modal-card" style="max-width:380px;">
+            <div class="modal-header">
+                <h3>Two-Factor Authentication</h3>
+                <button class="modal-close" onclick="closeTotpLoginPrompt()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div style="padding:16px 24px;text-align:center;">
+                <span class="material-icons" style="font-size:48px;color:var(--primary);margin-bottom:12px;">verified_user</span>
+                <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Enter the 6-digit code from your authenticator app.</p>
+                <div class="form-group">
+                    <input type="text" id="totpLoginCode" placeholder="000000" maxlength="6" style="text-align:center;font-size:24px;letter-spacing:8px;font-family:var(--mono);">
+                </div>
+                <div id="totpLoginError" class="hidden" style="color:var(--danger);font-size:12px;margin-top:4px;"></div>
+            </div>
+            <div class="modal-footer" style="justify-content:center;">
+                <button type="button" class="btn btn-primary" onclick="verifyTotpLogin()">
+                    <span class="material-icons" style="font-size:16px">check_circle</span> Verify
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeTotpLoginPrompt()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ═══ Toast Container ═══ -->
     <div id="toastContainer"></div>
 
@@ -1802,6 +2285,6 @@
         </div>
     </div>
 
-    <script src="/js/app.js?v=25"></script>
+    <script src="/js/app.js?v=28"></script>
 </body>
 </html>

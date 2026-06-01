@@ -7,7 +7,7 @@ import time
 import hashlib
 from typing import List, Optional
 from datetime import datetime
-from sqlalchemy import create_engine, Column, String, Integer, Boolean, Float, Text, DateTime, ForeignKey, Table, text
+from sqlalchemy import create_engine, Column, String, Integer, Boolean, Float, Text, DateTime, ForeignKey, Table, text, JSON
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session
 
 # ─── Config ──────────────────────────────────────────────────
@@ -29,6 +29,8 @@ class User(Base):
     display_name = Column(String(256), default="")
     role = Column(String(32), default="viewer")  # admin, operator, viewer
     oidc_sub = Column(String(256), nullable=True, unique=True, index=True)
+    totp_secret = Column(String(32), nullable=True)  # TOTP secret key
+    totp_enabled = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(Float, default=time.time)
 
@@ -190,6 +192,22 @@ class ScriptRun(Base):
     exec_time_ms = Column(Integer, nullable=True)
 
 
+class CronJob(Base):
+    """Persistent cron job definitions scheduled on VPS."""
+    __tablename__ = "cron_jobs"
+
+    id = Column(String(32), primary_key=True)
+    vps_id = Column(String(32), ForeignKey("vps.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(256), nullable=False)
+    schedule = Column(String(128), nullable=False)  # cron expression (e.g. "0 3 * * *")
+    command = Column(Text, nullable=False)
+    description = Column(Text, default="")
+    enabled = Column(Boolean, default=True)
+    created_by = Column(String(32), ForeignKey("users.id"), nullable=True)
+    created_at = Column(Float, default=time.time)
+    updated_at = Column(Float, default=time.time, onupdate=time.time)
+
+
 # ─── Helpers ─────────────────────────────────────────────────
 
 def init_db():
@@ -253,6 +271,28 @@ def init_db():
                 print("[Migration] Added pinned and tags columns to scripts")
     except Exception as e:
         print(f"[Migration] scripts pinned/tags (may already exist): {e}")
+
+    # Migration: add TOTP fields to users
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name='users' AND column_name='totp_secret'"
+            ))
+            if not result.fetchone():
+                conn.execute(text("ALTER TABLE users ADD COLUMN totp_secret VARCHAR(32)"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN totp_enabled BOOLEAN DEFAULT FALSE"))
+                conn.commit()
+                print("[Migration] Added totp_secret and totp_enabled columns to users")
+    except Exception as e:
+        print(f"[Migration] totp columns (may already exist): {e}")
+
+    # Migration: create cron_jobs table via metadata (create_all handles new tables)
+    try:
+        CronJob.__table__.create(bind=engine, checkfirst=True)
+        print("[Migration] Ensured cron_jobs table exists")
+    except Exception as e:
+        print(f"[Migration] cron_jobs table (may already exist): {e}")
 
 
 def get_db():
