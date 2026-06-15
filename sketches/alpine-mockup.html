@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en" x-data="appState()">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ServerSphere — Alpine.js Mockup</title>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: #09090B;
+    color: #F4F4F5;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+
+  /* ─── Animations ─── */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes slideInRight {
+    from { opacity: 0; transform: translateX(16px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.2); }
+    50% { box-shadow: 0 0 16px rgba(245, 158, 11, 0.4); }
+  }
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes countUp {
+    from { opacity: 0; transform: scale(0.5); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .animate-in { animation: fadeInUp 0.4s ease both; }
+  .animate-slide { animation: slideInRight 0.3s ease both; }
+  .stagger-1 { animation-delay: 0.05s; }
+  .stagger-2 { animation-delay: 0.1s; }
+  .stagger-3 { animation-delay: 0.15s; }
+  .stagger-4 { animation-delay: 0.2s; }
+  .stagger-5 { animation-delay: 0.25s; }
+  .stagger-6 { animation-delay: 0.3s; }
+
+  .pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+
+  .shimmer-bg {
+    background: linear-gradient(90deg, #1f1f23 25%, #27272A 50%, #1f1f23 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+
+  .count-up { animation: countUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+  /* Activity colors */
+  :root {
+    --emerald: #10B981;
+    --cyan: #06B6D4;
+    --amber: #F59E0B;
+    --rose: #F43F5E;
+    --purple: #8B5CF6;
+    --muted: #A1A1AA;
+  }
+
+  /* ─── Scrollbar ─── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #27272A; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #52525B; }
+
+  /* ─── Sidebar nav ─── */
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; border-radius: 6px;
+    color: #A1A1AA; font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s;
+    position: relative; text-decoration: none;
+  }
+  .nav-item:hover { background: rgba(245, 158, 11, 0.08); color: #F4F4F5; }
+  .nav-item.active {
+    background: rgba(245, 158, 11, 0.12);
+    color: #FBBF24;
+  }
+  .nav-item.active::before {
+    content: ''; position: absolute; left: -10px; top: 50%;
+    transform: translateY(-50%); width: 3px; height: 18px;
+    background: #F59E0B; border-radius: 0 3px 3px 0;
+  }
+  .nav-item svg, .nav-item .material-icons { width: 18px; height: 18px; font-size: 18px; }
+
+  /* ─── Stat cards ─── */
+  .stat-card {
+    background: #18181B; border: 1px solid #27272A;
+    border-radius: 10px; padding: 18px 20px;
+    transition: all 0.2s; cursor: default;
+  }
+  .stat-card:hover {
+    border-color: #52525B; transform: translateY(-1px);
+  }
+  .stat-value { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.1; }
+  .stat-label { font-size: 12px; font-weight: 500; color: #A1A1AA; margin-top: 4px; }
+
+  /* ─── Resource bar ─── */
+  .res-bar {
+    height: 6px; background: #1f1f23; border-radius: 99px; overflow: hidden; margin-top: 6px;
+  }
+  .res-bar-fill {
+    height: 100%; border-radius: 99px; transition: width 1s ease;
+  }
+
+  /* ─── VPS Card ─── */
+  .vps-card {
+    background: #18181B; border: 1px solid #27272A;
+    border-radius: 10px; padding: 18px 20px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .vps-card:hover {
+    border-color: #52525B; background: #1f1f23; transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  .status-online { background: #10B981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+  .status-offline { background: #52525B; }
+
+  /* ─── Tag ─── */
+  .tag {
+    display: inline-flex; font-size: 11px; font-weight: 600;
+    padding: 2px 8px; border-radius: 99px;
+    background: rgba(245, 158, 11, 0.12); color: #FBBF24;
+  }
+
+  /* ─── Toast ─── */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 999;
+    background: #18181B; border: 1px solid #27272A;
+    border-radius: 10px; padding: 14px 20px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+    display: flex; align-items: center; gap: 10px;
+    min-width: 280px;
+  }
+  .toast-success { border-left: 3px solid #10B981; }
+  .toast-info { border-left: 3px solid #06B6D4; }
+
+  /* ─── Modal overlay ─── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    z-index: 800; backdrop-filter: blur(4px);
+  }
+  .modal-box {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: #18181B; border: 1px solid #27272A;
+    border-radius: 12px; width: 480px; max-width: 90vw;
+    z-index: 801; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    padding: 0; overflow: hidden;
+  }
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 1px solid #27272A;
+  }
+  .modal-body { padding: 20px; }
+  .modal-footer {
+    display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+    padding: 12px 20px; border-top: 1px solid #27272A;
+  }
+  .modal-close {
+    width: 28px; height: 28px; border-radius: 6px;
+    border: none; background: transparent; color: #A1A1AA;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .modal-close:hover { background: #27272A; color: #F4F4F5; }
+
+  /* ─── Input ─── */
+  .input {
+    width: 100%; padding: 9px 12px; font-size: 13px; font-family: 'Inter', sans-serif;
+    background: #09090B; border: 1px solid #27272A;
+    border-radius: 6px; color: #F4F4F5; outline: none;
+    transition: border-color 0.2s;
+  }
+  .input:focus { border-color: #F59E0B; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1); }
+  .input::placeholder { color: #52525B; }
+
+  /* ─── Button ─── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border-radius: 6px;
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;
+    cursor: pointer; border: 1px solid #27272A;
+    background: transparent; color: #F4F4F5;
+    transition: all 0.15s; line-height: 1; white-space: nowrap;
+  }
+  .btn:hover { background: #1f1f23; border-color: #52525B; }
+  .btn-primary { background: #F59E0B; border-color: #F59E0B; color: #09090B; font-weight: 600; }
+  .btn-primary:hover { background: #FBBF24; border-color: #FBBF24; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; gap: 4px; }
+  .btn-xs { padding: 4px 8px; font-size: 11px; gap: 3px; }
+  .btn-icon { width: 32px; height: 32px; padding: 0; justify-content: center; }
+
+  /* ─── Table ─── */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .data-table th {
+    text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 600;
+    color: #A1A1AA; text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid #27272A; background: #1f1f23;
+  }
+  .data-table td { padding: 10px 14px; border-bottom: 1px solid #18181B; }
+  .data-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* ─── Tabs ─── */
+  .tab-btn {
+    padding: 8px 16px; border: none; background: transparent;
+    color: #A1A1AA; font-family: 'Inter', sans-serif; font-size: 13px;
+    font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .tab-btn:hover { color: #F4F4F5; }
+  .tab-btn.active { color: #FBBF24; border-bottom-color: #F59E0B; }
+
+  /* ─── Activity feed ─── */
+  .activity-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid #18181B;
+  }
+  .activity-dot {
+    width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0;
+  }
+
+  /* ─── Transition helpers ─── */
+  .x-fade-enter { opacity: 0; transform: translateY(8px); }
+  .x-fade-enter-active { opacity: 1; transform: translateY(0); transition: all 0.2s ease; }
+</style>
+</head>
+<body>
+
+<!-- ═══ APP STATE ═══ -->
+<script>
+function appState() {
+  return {
+    // ─── Layout ───
+    sidebarOpen: true,
+    currentPage: 'dashboard',
+    theme: 'dark',
+
+    // ─── Simulation ───
+    stats: { vps: 8, online: 6, offline: 2, containers: 23 },
+    previousStats: { vps: 6, online: 4, offline: 2, containers: 17 },
+    vpsResources: {
+      'staging-01': { cpu: 32, ram: 55, disk: 62, online: true },
+      'prod-api-01': { cpu: 78, ram: 82, disk: 44, online: true },
+      'prod-db-01': { cpu: 12, ram: 38, disk: 71, online: true },
+      'dev-box': { cpu: 5, ram: 22, disk: 35, online: true },
+      'monitoring': { cpu: 45, ram: 61, disk: 58, online: true },
+      'ci-runner': { cpu: 0, ram: 0, disk: 0, online: false },
+      'backup-01': { cpu: 0, ram: 0, disk: 0, online: false },
+      'cdn-cache': { cpu: 28, ram: 44, disk: 89, online: true },
+    },
+    vpsList: [
+      { id: 'staging-01', name: 'staging-01', host: '192.168.1.21', port: 22, user: 'deploy', group: 'Staging', tags: ['node', 'react'], color: '#10B981' },
+      { id: 'prod-api-01', name: 'prod-api-01', host: '203.0.113.45', port: 2222, user: 'admin', group: 'Production', tags: ['go', 'api'], color: '#F59E0B' },
+      { id: 'prod-db-01', name: 'prod-db-01', host: '203.0.113.46', port: 22, user: 'dbadmin', group: 'Production', tags: ['postgres'], color: '#06B6D4' },
+      { id: 'dev-box', name: 'dev-box', host: '10.0.0.5', port: 22, user: 'dev', group: 'Dev', tags: ['dev'], color: '#8B5CF6' },
+      { id: 'monitoring', name: 'monitoring', host: '192.168.1.50', port: 22, user: 'mon', group: 'Infra', tags: ['grafana', 'prom'], color: '#10B981' },
+      { id: 'cdn-cache', name: 'cdn-cache', host: '10.0.1.10', port: 22, user: 'cache', group: 'Infra', tags: ['nginx'], color: '#10B981' },
+      { id: 'ci-runner', name: 'ci-runner', host: '192.168.1.99', port: 22, user: 'ci', group: 'Dev', tags: ['docker'], color: '#F43F5E' },
+      { id: 'backup-01', name: 'backup-01', host: '10.0.0.100', port: 22, user: 'backup', group: 'Infra', tags: ['backup'], color: '#F43F5E' },
+    ],
+
+    // ─── Filters ───
+    searchQuery: '',
+    selectedGroup: 'all',
+    pageTitle: 'Dashboard Overview',
+
+    // ─── Modal ───
+    showAddVPS: false,
+    formName: '', formHost: '', formPort: '22', formUser: 'root',
+
+    // ─── Toast ───
+    toasts: [],
+
+    // ─── Search results ───
+    showSearchResults: false,
+
+    // ─── Computed ───
+    get filteredVPS() {
+      return this.vpsList.filter(v => {
+        const q = this.searchQuery.toLowerCase();
+        if (q && !v.name.toLowerCase().includes(q) && !v.host.includes(q)) return false;
+        if (this.selectedGroup !== 'all' && v.group !== this.selectedGroup) return false;
+        return true;
+      });
+    },
+
+    get groups() {
+      const g = [...new Set(this.vpsList.map(v => v.group))];
+      return g;
+    },
+
+    get onlineCount() {
+      return this.vpsList.filter(v => this.vpsResources[v.id]?.online).length;
+    },
+
+    get resourceChartData() {
+      return {
+        labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', 'Now'],
+        cpu: [23, 45, 67, 55, 72, 48, 38],
+        ram: [42, 48, 56, 61, 72, 58, 50],
+      };
+    },
+
+    // ─── Actions ───
+    navigate(page) {
+      this.currentPage = page;
+      const titles = {
+        dashboard: 'Dashboard Overview',
+        vps: 'VPS Instances',
+        compose: 'Docker Compose',
+        cron: 'Cron Jobs',
+        network: 'Network Tools',
+        scripts: 'Script Library',
+        settings: 'Settings',
+      };
+      this.pageTitle = titles[page] || 'Dashboard Overview';
+      this.searchQuery = '';
+      this.selectedGroup = 'all';
+    },
+
+    openAddVPS() {
+      this.formName = ''; this.formHost = '';
+      this.formPort = '22'; this.formUser = 'root';
+      this.showAddVPS = true;
+    },
+
+    submitVPS() {
+      this.showAddVPS = false;
+      this.addToast('success', `VPS "${this.formName}" created successfully`);
+    },
+
+    addToast(type, msg) {
+      this.toasts.push({ id: Date.now(), type, msg });
+      setTimeout(() => {
+        this.toasts = this.toasts.filter(t => t.id !== Date.now());
+      }, 3500);
+    },
+
+    deleteVPS(name) {
+      this.addToast('info', `VPS "${name}" marked for deletion`);
+    },
+
+    getResourceColor(val) {
+      if (val > 80) return '#F43F5E';
+      if (val > 60) return '#F59E0B';
+      return '#10B981';
+    },
+
+    // ─── Activity data ───
+    get activities() {
+      return [
+        { time:'2m ago', msg:'Container nginx-proxy restarted on prod-api-01', color:'var(--emerald)', icon:'restart_alt' },
+        { time:'8m ago', msg:'TOTP 2FA enabled for user maria', color:'var(--cyan)', icon:'security' },
+        { time:'15m ago', msg:'Cron job "DB Backup" completed on prod-db-01', color:'var(--amber)', icon:'check_circle' },
+        { time:'32m ago', msg:'CPU threshold exceeded on prod-api-01 (82%)', color:'var(--rose)', icon:'warning' },
+        { time:'1h ago', msg:'Script "System Update" ran on 3 VPS', color:'var(--muted)', icon:'terminal' },
+        { time:'2h ago', msg:'VPS cdn-cache added to group Infra', color:'var(--purple)', icon:'dns' },
+      ];
+    },
+
+    // ─── Init ───
+    init() {
+      // Simulate live-updating CPU values
+      setInterval(() => {
+        for (const v of this.vpsList) {
+          if (this.vpsResources[v.id]?.online) {
+            this.vpsResources[v.id].cpu = Math.min(95, Math.max(2,
+              this.vpsResources[v.id].cpu + (Math.random() - 0.5) * 10
+            ));
+            this.vpsResources[v.id].ram = Math.min(90, Math.max(15,
+              this.vpsResources[v.id].ram + (Math.random() - 0.5) * 6
+            ));
+          }
+        }
+      }, 3000);
+    }
+  }
+}
+</script>
+
+<!-- ═══ LAYOUT ═══ -->
+<div class="flex h-screen overflow-hidden">
+
+  <!-- Sidebar -->
+  <aside class="w-60 flex flex-col flex-shrink-0 border-r border-[#27272A] bg-[#111113] z-10"
+       :class="{'w-60': sidebarOpen, 'w-16': !sidebarOpen}"
+       x-transition:enter="transition-all duration-200">
+
+    <!-- Brand -->
+    <div class="flex items-center gap-2.5 px-5 py-4 border-b border-[#27272A] min-h-[58px]"
+         :class="{'px-4 justify-center': !sidebarOpen}">
+      <svg viewBox="0 0 32 32" class="w-7 h-7 flex-shrink-0">
+        <circle cx="8" cy="8" r="3" fill="#F59E0B" opacity="0.4"/>
+        <circle cx="20" cy="6" r="3.5" fill="#F59E0B" opacity="0.6"/>
+        <circle cx="14" cy="18" r="4.5" fill="#F59E0B"/>
+        <circle cx="25" cy="19" r="2.5" fill="#34D399" opacity="0.7"/>
+        <circle cx="8" cy="25" r="2" fill="#10B981" opacity="0.5"/>
+      </svg>
+      <span x-show="sidebarOpen" x-cloak class="text-base font-bold tracking-tight">ServerSphere</span>
+      <span x-show="sidebarOpen" x-cloak class="text-[10px] font-bold bg-[#F59E0B] text-[#78350F] px-1.5 py-0.5 rounded-full ml-auto leading-none">v0.3.0</span>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 overflow-y-auto px-2.5 py-2 space-y-0.5">
+      <div class="text-[10px] font-semibold uppercase tracking-wider text-[#52525B] px-2.5 pt-4 pb-1.5"
+           x-show="sidebarOpen" x-cloak>Main</div>
+
+      <template x-for="item in [
+        { id:'dashboard', icon:'dashboard', label:'Overview' },
+        { id:'vps', icon:'dns', label:'Instances' },
+        { id:'compose', icon:'layers', label:'Docker Compose' },
+        { id:'cron', icon:'schedule', label:'Cron Jobs' },
+        { id:'network', icon:'lan', label:'Network Tools' },
+      ]" :key="item.id">
+        <a href="#" class="nav-item" :class="{ active: currentPage === item.id }"
+           @click.prevent="navigate(item.id)"
+           x-tooltip.raw="sidebarOpen ? '' : item.label">
+          <span class="material-icons text-lg" x-text="item.icon"></span>
+          <span x-show="sidebarOpen" x-cloak x-text="item.label"></span>
+        </a>
+      </template>
+
+      <div class="text-[10px] font-semibold uppercase tracking-wider text-[#52525B] px-2.5 pt-4 pb-1.5"
+           x-show="sidebarOpen" x-cloak>Management</div>
+
+      <template x-for="item in [
+        { id:'scripts', icon:'terminal', label:'Script Library' },
+        { id:'settings', icon:'settings', label:'Settings' },
+      ]" :key="item.id">
+        <a href="#" class="nav-item" :class="{ active: currentPage === item.id }"
+           @click.prevent="navigate(item.id)">
+          <span class="material-icons text-lg" x-text="item.icon"></span>
+          <span x-show="sidebarOpen" x-cloak x-text="item.label"></span>
+        </a>
+      </template>
+    </nav>
+
+    <!-- Footer -->
+    <div class="px-2.5 py-2.5 border-t border-[#27272A]">
+      <div x-show="sidebarOpen" x-cloak class="flex items-center gap-2 px-2.5 py-1.5">
+        <div class="w-7 h-7 rounded-full bg-gradient-to-br from-[#FBBF24] to-[#D97706] flex items-center justify-center text-white text-xs font-bold">ES</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-xs font-medium truncate">Endang</div>
+          <div class="text-[10px] text-[#52525B]">Admin</div>
+        </div>
+        <button class="btn-icon btn-xs" @click="sidebarOpen = !sidebarOpen">
+          <span class="material-icons text-base" x-text="sidebarOpen ? 'chevron_left' : 'chevron_right'"></span>
+        </button>
+      </div>
+      <div x-show="!sidebarOpen" class="flex justify-center">
+        <button class="btn-icon btn-xs" @click="sidebarOpen = !sidebarOpen">
+          <span class="material-icons text-base">chevron_right</span>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Panel -->
+  <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <!-- Topbar -->
+    <header class="flex items-center gap-3 px-6 h-[58px] border-b border-[#27272A] bg-[#09090B]/80 backdrop-blur-lg flex-shrink-0">
+      <!-- Page Title -->
+      <div>
+        <h1 class="text-base font-semibold tracking-tight" x-text="pageTitle"></h1>
+      </div>
+
+      <!-- Center: Search -->
+      <div class="flex-1 flex justify-center">
+        <div class="relative w-full max-w-sm" @click.outside="showSearchResults = false">
+          <span class="material-icons absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-[#52525B]">search</span>
+          <input type="text" placeholder="Search VPS, scripts, users..."
+                 class="input !pl-8 !rounded-full !text-xs !py-1.5"
+                 x-model="searchQuery"
+                 @focus="showSearchResults = true"
+                 @keydown.escape="showSearchResults = false">
+          <!-- Live search dropdown -->
+          <div x-show="showSearchResults && searchQuery.length > 0" x-cloak
+               class="absolute top-full mt-1 left-0 right-0 bg-[#18181B] border border-[#27272A] rounded-lg shadow-xl z-50 max-h-64 overflow-y-auto">
+            <template x-for="v in vpsList.filter(v => v.name.toLowerCase().includes(searchQuery.toLowerCase()))" :key="v.id">
+              <div class="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-[#1f1f23] text-sm"
+                   @click="navigate('vps'); searchQuery = v.name; showSearchResults = false">
+                <span class="status-dot" :class="vpsResources[v.id]?.online ? 'status-online' : 'status-offline'"></span>
+                <span x-text="v.name" class="font-medium"></span>
+                <span x-text="v.host" class="text-xs text-[#52525B] mono ml-auto"></span>
+              </div>
+            </template>
+            <div x-show="vpsList.filter(v => v.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0"
+                 class="px-4 py-3 text-xs text-[#52525B] text-center">No results found</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right -->
+      <div class="flex items-center gap-2 ml-auto">
+        <button class="btn btn-sm" @click="addToast('info', 'Refreshing all connections...')">
+          <span class="material-icons text-base">refresh</span>
+          <span class="hidden sm:inline">Refresh</span>
+        </button>
+        <div class="user-menu flex items-center gap-2 pl-4 pr-2 py-1 rounded-full border border-[#27272A] cursor-pointer hover:border-[#52525B] transition-colors">
+          <div class="w-7 h-7 rounded-full bg-gradient-to-br from-[#FBBF24] to-[#D97706] flex items-center justify-center text-white text-xs font-bold">ES</div>
+          <span class="text-xs font-medium hidden md:inline text-[#A1A1AA]">Endang</span>
+          <span class="material-icons text-sm text-[#52525B]">expand_more</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ═══ DASHBOARD PAGE ═══ -->
+    <main x-show="currentPage === 'dashboard'" class="flex-1 overflow-y-auto p-6 xl:p-8 space-y-6">
+      <!-- Stat cards row -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <template x-for="(stat, i) in [
+          { label:'Total VPS', value: vpsList.length, icon:'dns', color:'#F59E0B', prev: 6 },
+          { label:'Online', value: onlineCount, icon:'check_circle', color:'#10B981', prev: 4 },
+          { label:'Offline', value: vpsList.length - onlineCount, icon:'error_outline', color:'#F43F5E', prev: 2 },
+          { label:'Containers', value: stats.containers, icon:'layers', color:'#06B6D4', prev: 17 },
+        ]">
+          <div class="stat-card animate-in" :class="'stagger-'+(i+1)">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="stat-value" x-text="stat.value"></div>
+                <div class="stat-label" x-text="stat.label"></div>
+              </div>
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center" :style="'background:'+stat.color+'15'">
+                <span class="material-icons" :style="'color:'+stat.color" x-text="stat.icon"></span>
+              </div>
+            </div>
+            <!-- Mini sparkline bar -->
+            <div class="flex items-center gap-1.5 mt-3">
+              <div class="flex-1 flex items-end gap-0.5 h-8">
+                <template x-for="n in [23,35,28,45,52,38,stat.value*8]" :key="n">
+                  <div class="w-full rounded-sm transition-all duration-500"
+                       :style="'height:'+Math.min(n,40)+'px;background:'+stat.color+'40'"></div>
+                </template>
+              </div>
+              <span class="text-[10px] text-[#52525B] mono whitespace-nowrap">7d</span>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Resource overview -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <!-- VPS Grid -->
+        <div class="lg:col-span-2 space-y-3">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold">VPS Instances</h2>
+            <div class="flex items-center gap-2">
+              <!-- Group filter pills -->
+              <div class="flex gap-1">
+                <template x-for="g in ['all', ...groups]" :key="g">
+                  <button class="px-2.5 py-1 text-[11px] font-medium rounded-full transition-all"
+                          :class="selectedGroup === g ? 'bg-[#F59E0B] text-[#09090B]' : 'bg-[#1f1f23] text-[#A1A1AA] hover:text-[#F4F4F5]'"
+                          @click="selectedGroup = g"
+                          x-text="g === 'all' ? 'All' : g"></button>
+                </template>
+              </div>
+              <button class="btn btn-sm btn-primary" @click="openAddVPS()">
+                <span class="material-icons text-sm">add</span> Add VPS
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <template x-for="(v, i) in filteredVPS" :key="v.id">
+              <div class="vps-card animate-in" :class="'stagger-'+(i+1)">
+                <div class="flex items-start gap-3">
+                  <span class="status-dot mt-1" :class="vpsResources[v.id]?.online ? 'status-online' : 'status-offline'"
+                        :title="vpsResources[v.id]?.online ? 'Online' : 'Offline'"></span>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-semibold" x-text="v.name"></span>
+                      <span x-show="v.group" class="tag text-[10px] px-1.5 py-0.5" x-text="v.group"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 mt-0.5 text-xs text-[#52525B] mono">
+                      <span class="material-icons" style="font-size:12px">dns</span>
+                      <span x-text="v.host+':'+v.port"></span>
+                    </div>
+                  </div>
+                  <div class="flex gap-1 flex-shrink-0">
+                    <button class="btn btn-xs" @click.stop="navigate('vps')" title="Open">
+                      <span class="material-icons text-xs">open_in_new</span>
+                    </button>
+                    <button class="btn btn-xs" @click.stop="deleteVPS(v.name)" title="Delete">
+                      <span class="material-icons text-xs">delete</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Resource bars (live) -->
+                <div x-show="vpsResources[v.id]?.online" x-cloak class="mt-3 pt-3 border-t border-[#1f1f23] space-y-2">
+                  <div>
+                    <div class="flex items-center justify-between text-[11px]">
+                      <span class="text-[#A1A1AA]">CPU</span>
+                      <span class="mono font-semibold" :style="'color:'+getResourceColor(vpsResources[v.id]?.cpu||0)"
+                            x-text="Math.round(vpsResources[v.id]?.cpu||0)+'%'"></span>
+                    </div>
+                    <div class="res-bar">
+                      <div class="res-bar-fill" :style="'width:'+(vpsResources[v.id]?.cpu||0)+'%;background:'+getResourceColor(vpsResources[v.id]?.cpu||0)"></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="flex items-center justify-between text-[11px]">
+                      <span class="text-[#A1A1AA]">RAM</span>
+                      <span class="mono font-semibold" :style="'color:'+getResourceColor(vpsResources[v.id]?.ram||0)"
+                            x-text="Math.round(vpsResources[v.id]?.ram||0)+'%'"></span>
+                    </div>
+                    <div class="res-bar">
+                      <div class="res-bar-fill" :style="'width:'+(vpsResources[v.id]?.ram||0)+'%;background:'+getResourceColor(vpsResources[v.id]?.ram||0)"></div>
+                    </div>
+                  </div>
+                </div>
+                <div x-show="!vpsResources[v.id]?.online" class="mt-3 pt-3 border-t border-[#1f1f23] text-center text-xs text-[#52525B]">
+                  <span class="material-icons text-sm align-middle">cloud_off</span> Offline — no metrics
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Side: Activity Feed -->
+        <div class="space-y-3">
+          <h2 class="text-sm font-semibold">Recent Activity</h2>
+          <div class="bg-[#18181B] border border-[#27272A] rounded-xl p-4 space-y-0">
+            <template x-for="(act, i) in activities" :key="i">
+              <div class="activity-item animate-slide" :class="'stagger-'+(i+1)">
+                <div class="activity-dot" :style="'background:'+act.color"></div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <span class="material-icons" :style="'font-size:14px;color:'+act.color" x-text="act.icon"></span>
+                    <span class="text-xs text-[#A1A1AA]" x-text="act.msg"></span>
+                  </div>
+                  <div class="text-[10px] text-[#52525B] mt-0.5" x-text="act.time"></div>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Quick actions -->
+          <div class="bg-[#18181B] border border-[#27272A] rounded-xl p-4">
+            <h3 class="text-xs font-semibold text-[#A1A1AA] uppercase tracking-wider mb-3">Quick Actions</h3>
+            <div class="space-y-2">
+              <button class="btn btn-sm w-full justify-start" @click="openAddVPS()">
+                <span class="material-icons text-sm">add_circle</span> Add VPS
+              </button>
+              <button class="btn btn-sm w-full justify-start" @click="navigate('scripts')">
+                <span class="material-icons text-sm">terminal</span> Run Script
+              </button>
+              <button class="btn btn-sm w-full justify-start" @click="addToast('info', 'Bulk disk cleanup triggered on 3 VPS')">
+                <span class="material-icons text-sm">cleaning_services</span> Bulk Cleanup
+              </button>
+            </div>
+          </div>
+
+          <!-- System health mini -->
+          <div class="bg-[#18181B] border border-[#27272A] rounded-xl p-4">
+            <h3 class="text-xs font-semibold text-[#A1A1AA] uppercase tracking-wider mb-3">System Health</h3>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-[#A1A1AA]">Server Uptime</span>
+                <span class="mono font-medium text-[#10B981]">12d 7h 34m</span>
+              </div>
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-[#A1A1AA]">Docker Engine</span>
+                <span class="text-[#10B981]">✅ Running</span>
+              </div>
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-[#A1A1AA]">Last Backup</span>
+                <span class="text-[#A1A1AA]">3h ago</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ═══ PLACEHOLDER PAGES (show interactivity) ═══ -->
+    <main x-show="currentPage !== 'dashboard'" class="flex-1 overflow-y-auto p-6 xl:p-8">
+      <div class="flex flex-col items-center justify-center h-full text-center">
+        <span class="material-icons text-5xl text-[#27272A] mb-4"
+              x-text="{ vps:'dns', compose:'layers', cron:'schedule', network:'lan', scripts:'terminal', settings:'settings' }[currentPage] || 'dashboard'"></span>
+        <h2 class="text-lg font-semibold mb-1" x-text="pageTitle"></h2>
+        <p class="text-sm text-[#52525B] max-w-md">
+          Halaman ini akan di-refactor dengan Alpine.js. Kembali ke
+          <a href="#" class="text-[#F59E0B] font-medium hover:underline" @click.prevent="navigate('dashboard')">Dashboard</a>.
+        </p>
+        <!-- Show filtered VPS count -->
+        <div class="mt-4 flex gap-2" x-show="currentPage === 'vps'">
+          <span class="tag" x-text="onlineCount + ' online'"></span>
+          <span class="tag" x-text="(vpsList.length - onlineCount) + ' offline'"></span>
+          <span class="tag" x-text="vpsList.length + ' total'"></span>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ═══ ADD VPS MODAL ═══ -->
+<template x-teleport="body">
+  <div x-show="showAddVPS" x-cloak>
+    <div class="modal-overlay" @click="showAddVPS = false"
+         x-transition:enter="opacity-0" x-transition:enter-end="opacity-100"
+         x-transition:leave="opacity-100" x-transition:leave-end="opacity-0"
+         style="transition: opacity 0.2s"></div>
+    <div class="modal-box"
+         x-transition:enter="opacity-0 scale-95 translate-y-4"
+         x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+         x-transition:leave="opacity-100 scale-100 translate-y-0"
+         x-transition:leave-end="opacity-0 scale-95 translate-y-4"
+         style="transition: all 0.2s ease">
+      <div class="modal-header">
+        <h2 class="text-sm font-semibold">Add VPS Instance</h2>
+        <button class="modal-close" @click="showAddVPS = false">
+          <span class="material-icons text-lg">close</span>
+        </button>
+      </div>
+      <div class="modal-body space-y-4">
+        <div>
+          <label class="text-xs font-medium text-[#A1A1AA] mb-1.5 block">Display Name</label>
+          <input type="text" class="input" placeholder="e.g. prod-api-01" x-model="formName">
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div class="col-span-2">
+            <label class="text-xs font-medium text-[#A1A1AA] mb-1.5 block">Host / IP</label>
+            <input type="text" class="input" placeholder="192.168.1.1" x-model="formHost">
+          </div>
+          <div>
+            <label class="text-xs font-medium text-[#A1A1AA] mb-1.5 block">Port</label>
+            <input type="text" class="input" placeholder="22" x-model="formPort">
+          </div>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-[#A1A1AA] mb-1.5 block">SSH User</label>
+          <input type="text" class="input" placeholder="root" x-model="formUser">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" @click="showAddVPS = false">Cancel</button>
+        <button class="btn btn-primary" @click="submitVPS()"
+                :disabled="!formName || !formHost"
+                :class="(!formName || !formHost) ? 'opacity-50 cursor-not-allowed' : ''">
+          <span class="material-icons text-sm">add</span> Create VPS
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- ═══ TOAST CONTAINER ═══ -->
+<div class="fixed bottom-6 right-6 z-[999] space-y-2">
+  <template x-for="toast in toasts" :key="toast.id">
+    <div class="toast"
+         :class="toast.type === 'success' ? 'toast-success' : 'toast-info'"
+         x-transition:enter="opacity-0 translate-x-8"
+         x-transition:enter-end="opacity-100 translate-x-0"
+         x-transition:leave="opacity-0 translate-x-8"
+         style="transition: all 0.3s ease">
+      <span class="material-icons text-lg"
+            :class="toast.type === 'success' ? 'text-[#10B981]' : 'text-[#06B6D4]'"
+            x-text="toast.type === 'success' ? 'check_circle' : 'info'"></span>
+      <span class="text-sm" x-text="toast.msg"></span>
+      <button class="ml-auto text-[#52525B] hover:text-[#A1A1AA]" @click="toasts = toasts.filter(t => t.id !== toast.id)">
+        <span class="material-icons text-sm">close</span>
+      </button>
+    </div>
+  </template>
+</div>
+
+<!-- Alpine.js Tippy for tooltips -->
+<script>
+  // Add tooltip directive if needed
+  document.addEventListener('alpine:init', () => {
+    Alpine.directive('tooltip', (el, { expression }) => {
+      el.setAttribute('title', expression)
+    })
+  })
+</script>
+
+</body>
+</html>

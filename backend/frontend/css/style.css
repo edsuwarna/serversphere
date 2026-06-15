@@ -144,6 +144,9 @@ a { color: inherit; text-decoration: none; }
 
 .hidden { display: none !important; }
 
+/* ═══ Alpine.js ═══ */
+[x-cloak] { display: none !important; }
+
 /* ═══ Scrollbar ═══ */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

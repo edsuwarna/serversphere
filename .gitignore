@@ -1,17 +1,3 @@
-# Python
+.venv/
 __pycache__/
 *.pyc
-*.pyo
-
-# Environment
-.env
-
-# Registry secrets (NEVER commit these!)
-registry/key.pem
-
-# Data
-pg-data/
-
-# IDE
-.vscode/
-.idea/
