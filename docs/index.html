@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ServerSphere — Multi-Server Dashboard</title>
+    <meta name="description" content="ServerSphere: manage all your VPS servers from one web dashboard — SSH terminal, container management, monitoring, RBAC. No client tools needed.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #0d1117; --bg2: #161b22; --bg3: #1c2128; --border: #30363d;
+            --text: #e6edf3; --text2: #8b949e; --text3: #484f58;
+            --accent: #58a6ff; --green: #3fb950; --orange: #d29922;
+            --card-bg: #161b22; --card-border: #30363d;
+            --hero-bg-start: #0d1117; --hero-bg-end: #161b22;
+            --btn-primary-bg: #238636; --btn-primary-border: #2ea043;
+            --btn-secondary-bg: #21262d; --btn-secondary-border: #30363d;
+            --footer-text: #484f58;
+        }
+        [data-theme="light"] {
+            --bg: #ffffff; --bg2: #f6f8fa; --bg3: #eef1f5; --border: #d0d7de;
+            --text: #1f2328; --text2: #656d76; --text3: #afb8c1;
+            --accent: #0969da; --green: #1a7f37; --orange: #9a6700;
+            --card-bg: #ffffff; --card-border: #d0d7de;
+            --hero-bg-start: #f6f8fa; --hero-bg-end: #ffffff;
+            --btn-primary-bg: #1f883d; --btn-primary-border: #1a7f37;
+            --btn-secondary-bg: #f6f8fa; --btn-secondary-border: #d0d7de;
+            --footer-text: #656d76;
+        }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; transition: background 0.2s, color 0.2s; }
+        .theme-toggle { position: fixed; top: 12px; right: 12px; z-index: 300; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        .theme-toggle:hover { background: var(--bg3); }
+        .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+        .hero { padding: 80px 0 48px; text-align: center; }
+        .hero-badge { display: inline-flex; align-items: center; gap: 6px; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; margin-bottom: 24px; }
+        .hero h1 { font-size: 44px; font-weight: 800; line-height: 1.15; margin-bottom: 16px; }
+        .hero h1 .highlight { background: linear-gradient(135deg, var(--accent), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero .subtitle { font-size: 17px; color: var(--text2); max-width: 580px; margin: 0 auto 32px; line-height: 1.6; }
+        .hero-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; text-decoration: none; transition: all 0.2s; }
+        .btn-primary { background: var(--btn-primary-bg); color: #fff; border: 1px solid var(--btn-primary-border); }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-secondary { background: var(--btn-secondary-bg); color: var(--text); border: 1px solid var(--btn-secondary-border); }
+        .btn-secondary:hover { background: var(--bg3); }
+
+        .problem { max-width: 640px; margin: 48px auto; text-align: center; padding: 0 20px; }
+        .problem p { font-size: 16px; color: var(--text2); line-height: 1.7; }
+        .problem strong { color: var(--text); }
+
+        .section-title { font-size: 20px; font-weight: 700; margin: 56px 0 8px; text-align: center; }
+        .section-subtitle { font-size: 14px; color: var(--text2); text-align: center; margin-bottom: 28px; }
+        .features { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin: 24px 0; }
+        .grid-3 { grid-template-columns: repeat(3, 1fr); }
+        .feature-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: 20px; transition: all 0.2s; }
+        .feature-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+        .feature-card .icon { font-size: 24px; margin-bottom: 8px; }
+        .feature-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+        .feature-card p { font-size: 13px; color: var(--text2); line-height: 1.5; }
+        .feature-card .note { font-size: 12px; color: var(--text3); margin-top: 8px; font-style: italic; }
+
+        .section-title-sm { font-size: 16px; font-weight: 700; margin: 40px 0 8px; }
+        .install-box { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin: 20px 0; }
+        .code-block { position: relative; }
+        .copy-btn {
+            position: absolute; top: 8px; right: 8px; z-index: 10;
+            background: var(--bg3); border: 1px solid var(--border);
+            border-radius: 6px; width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 14px; opacity: 0; transition: all 0.2s;
+            color: var(--text2);
+        }
+        .code-block:hover .copy-btn { opacity: 1; }
+        .copy-btn:hover { background: var(--accent); color: #fff; }
+        .copy-btn.copied { opacity: 1; background: var(--green); color: #fff; }
+        code { display: block; background: var(--bg3); padding: 16px 20px; border-radius: 6px; font-size: 13px; line-height: 1.7; overflow-x: auto; font-family: 'SF Mono', 'Fira Code', monospace; }
+        .tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+        .tab { padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--bg3); color: var(--text2); transition: all 0.2s; }
+        .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .tab:hover:not(.active) { background: var(--bg2); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .comment { color: var(--text2); }
+
+        .who-section { margin: 48px 0; }
+        .who-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .who-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: 20px; text-align: center; }
+        .who-card .role { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+        .who-card p { font-size: 13px; color: var(--text2); line-height: 1.5; }
+
+        .cta-section { text-align: center; padding: 48px 0; }
+        .cta-section h2 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+        .cta-section p { color: var(--text2); margin-bottom: 20px; font-size: 15px; }
+
+        footer { text-align: center; padding: 40px 0 30px; font-size: 13px; color: var(--footer-text); border-top: 1px solid var(--border); margin-top: 60px; }
+        footer a { color: var(--accent); text-decoration: none; }
+
+        @media (max-width: 640px) {
+            .hero h1 { font-size: 28px; }
+            .features { grid-template-columns: 1fr; }
+            .tabs { flex-direction: column; }
+            .who-grid { grid-template-columns: 1fr; }
+            .hero { padding: 56px 0 32px; }
+        }
+    </style>
+</head>
+<body>
+    <button class="theme-toggle" id="themeToggle">🌙</button>
+    <div class="container">
+
+    <!-- Hero -->
+    <div class="hero">
+        <div class="hero-badge">🐚 Open source · MIT · 🔑 OIDC / SSO</div>
+        <h1>All your <span class="highlight">VPS servers</span>, one dashboard</h1>
+        <div class="subtitle">
+            Got 5, 10, or 50 servers scattered across different providers?<br>
+            Stop jumping between SSH tabs. Everything from your browser, no client tools needed.
+        </div>
+        <div class="hero-btns">
+            <a href="docs.html?page=overview" class="btn btn-primary">📖 Documentation</a>
+            <a href="https://github.com/edsuwarna/serversphere" class="btn btn-secondary">GitHub →</a>
+        </div>
+    </div>
+
+    <!-- Problem -->
+    <div class="problem">
+        <p>
+            I run a few side projects, each with their own VPS. Nothing crazy — but every time I need to 
+            SSH in, I have to remember which IP belongs to which project. Sure, SSH config helps, 
+            but when <strong>multiple people need access</strong>, I'm adding public keys one by one to 
+            every server. Audit logs? Basically non-existent. Need to install Docker on all servers or 
+            reboot a few? Gotta run the same command on each one manually.
+        </p>
+        <p style="margin-top:12px;">
+            There are tools out there that do this — but most of them are way too complex for what I need. 
+            I just wanted something that fits <strong>my use case</strong>, nothing more.
+        </p>
+        <p style="margin-top:12px;">
+            So I built ServerSphere. With a little help from AI, of course 😁
+        </p>
+    </div>
+
+    <!-- How it works -->
+    <h2 class="section-title">💡 How it works</h2>
+    <div class="features grid-3">
+        <div class="feature-card" style="text-align:center;">
+            <div class="icon">🔌</div>
+            <h3>Connect via SSH</h3>
+            <p>ServerSphere uses Paramiko to SSH into your servers. <strong>No agent to install</strong> — just your regular SSH keys.</p>
+        </div>
+        <div class="feature-card" style="text-align:center;">
+            <div class="icon">📡</div>
+            <h3>Data via SSH</h3>
+            <p>Server status, containers, logs, metrics — all fetched in real-time over your existing SSH connection. One port, zero config.</p>
+        </div>
+        <div class="feature-card" style="text-align:center;">
+            <div class="icon">🌐</div>
+            <h3>Dashboard in your browser</h3>
+            <p>Everything served in a clean web UI. Interactive terminal, container controls, monitoring graphs — point and click.</p>
+        </div>
+    </div>
+
+    <!-- Features -->
+    <h2 class="section-title">✨ Features</h2>
+    <p class="section-subtitle">Stop SSH-ing just to check uptime or restart a container</p>
+    <div class="features">
+        <div class="feature-card">
+            <div class="icon">🗺️</div>
+            <h3>VPS Overview</h3>
+            <p>All servers on one page. Status, IP, resource usage — immediately see which one is down.</p>
+        </div>
+        <div class="feature-card">
+            <div class="icon">💻</div>
+            <h3>SSH Terminal</h3>
+            <p>Full interactive terminal via WebSocket (xterm.js). Run <code>apt update</code>, <code>top</code>, <code>vim</code> — right from your browser. Multiple tabs for different servers.</p>
+        </div>
+        <div class="feature-card">
+            <div class="icon">🐳</div>
+            <h3>Container Management</h3>
+            <p>List, start, stop, restart, remove containers from the dashboard. View logs & resource usage per container. No more <code>docker ps</code> every time.</p>
+        </div>
+        <div class="feature-card">
+            <div class="icon">📋</div>
+            <h3>System Logs</h3>
+            <p>Browse syslog, auth, kernel, docker, nginx logs directly. Filter by severity, search keywords. No more <code>tail -f</code> SSH sessions.</p>
+        </div>
+        <div class="feature-card">
+            <div class="icon">📊</div>
+            <h3>Resource Monitoring</h3>
+            <p>CPU bars, RAM used/total, disk usage, load average. Visual progress bars with real-time updates.</p>
+        </div>
+        <div class="feature-card">
+            <div class="icon">🔐</div>
+            <h3>RBAC + User Management</h3>
+            <p>Admin, Operator, Viewer roles with per-VPS access control. Give your team access without sharing SSH keys. Full audit trail. Combine with <a href="docs.html?page=oidc">SSO via OIDC</a> for team-wide access.</p>
+        </div>
+        <div class="feature-card">
+            <div class="icon">🔑</div>
+            <h3>SSO via OIDC</h3>
+            <p>Login with your corporate identity provider — Google Workspace, Microsoft Entra ID, GitHub, Auth0, or any OIDC-compatible provider. Auto-provision users with role mapping from groups.</p>
+            <p class="note">No LDAP or SAML needed. OpenID Connect only.</p>
+        </div>
+    </div>
+
+    <!-- Who is it for -->
+    <h2 class="section-title">🎯 Who is it for</h2>
+    <div class="who-section">
+        <div class="who-grid">
+            <div class="who-card">
+                <div class="role">🧑‍💻 DevOps</div>
+                <p>Manage 5-50 VPS from a single dashboard without opening 50 terminal tabs.</p>
+            </div>
+            <div class="who-card">
+                <div class="role">👨‍🔧 Sysadmin</div>
+                <p>Monitor servers, run terminals, manage containers without installing anything on your laptop.</p>
+            </div>
+            <div class="who-card">
+                <div class="role">👥 Team Lead</div>
+                <p>Give limited VPS access to team members. See who did what with the full audit log.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Install -->
+    <h2 class="section-title">🚀 Run in 2 minutes</h2>
+    <p class="section-subtitle">Docker image ready to go — just <code>docker compose up -d</code></p>
+    <div class="install-box">
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('pull')">Use Image</div>
+            <div class="tab" onclick="switchTab('clone')">Clone & Build</div>
+        </div>
+
+        <div id="tab-pull" class="tab-content active">
+            <div class="code-block">
+                <code>
+                    <span class="comment"># docker-compose.yml — image from GHCR, no repo clone needed</span><br>
+                    services:<br>
+                    &nbsp;&nbsp;serversphere:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;image: ghcr.io/edsuwarna/serversphere:latest<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;container_name: serversphere<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;restart: unless-stopped<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;ports:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- "8080:8080"<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;environment:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- DASHBOARD_PASS=change-me<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- SECRET_KEY=change-me-too<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- POSTGRES_PASSWORD=change-me<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;volumes:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- ~/.ssh:/root/.ssh:ro<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;depends_on:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;serversphere-db:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;condition: service_healthy<br>
+                    &nbsp;&nbsp;serversphere-db:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;image: postgres:18-alpine<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;container_name: serversphere-db<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;restart: unless-stopped<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;environment:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- POSTGRES_PASSWORD=change-me<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;volumes:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- pg-data:/var/lib/postgresql<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;healthcheck:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;test: ["CMD-SHELL", "pg_isready -U vpsadmin -d vpsdashboard"]<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;interval: 5s<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;timeout: 5s<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;retries: 5<br>
+                    &nbsp;&nbsp;&nbsp;volumes:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pg-data:
+                </code>
+            </div>
+            <p style="margin-top: 12px;">Run: <code style="display:inline; padding: 4px 8px;">docker compose up -d</code> — open <code style="display:inline; padding: 4px 8px;">http://server-ip:8080</code></p>
+        </div>
+
+        <div id="tab-clone" class="tab-content">
+            <div class="code-block">
+                <code>
+                    <span class="comment"># Clone repo & build yourself</span><br>
+                    git clone https://github.com/edsuwarna/serversphere.git<br>
+                    cd serversphere<br><br>
+                    <span class="comment"># Build & run</span><br>
+                    docker compose up -d --build
+                </code>
+            </div>
+        </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-section">
+        <h2>Still SSH-ing into each server one by one? 🥲</h2>
+        <p>Give it a spin — Docker pull, 2 minutes, done.</p>
+        <div class="hero-btns">
+            <a href="docs.html?page=quickstart" class="btn btn-primary">⚡ Quick Start</a>
+            <a href="https://github.com/edsuwarna/serversphere" class="btn btn-secondary">⭐ GitHub</a>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        Built by <a href="https://github.com/edsuwarna">Endang Suwarna</a> — because SSH-ing into servers one by one is a waste of life · MIT License · <a href="https://github.com/edsuwarna/serversphere">GitHub</a>
+    </footer>
+
+    </div>
+
+    <script>
+        function getTheme() { return document.documentElement.getAttribute('data-theme'); }
+        function setTheme(t) {
+            document.documentElement.setAttribute('data-theme', t);
+            localStorage.setItem('serversphere-theme', t);
+            document.getElementById('themeToggle').textContent = t === 'dark' ? '🌙' : '☀️';
+        }
+        document.getElementById('themeToggle').addEventListener('click', () => setTheme(getTheme() === 'dark' ? 'light' : 'dark'));
+        const saved = localStorage.getItem('serversphere-theme');
+        if (saved) setTheme(saved);
+
+        function switchTab(name) {
+            document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
+            document.getElementById('tab-' + name).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function copyCode(btn) {
+            const code = btn.parentElement.querySelector('code');
+            const text = Array.from(code.childNodes).map(n =>
+                n.nodeType === 1 && n.tagName === 'BR' ? '\n' : n.textContent
+            ).join('').trim();
+            navigator.clipboard.writeText(text).then(() => {
+                btn.textContent = '✅';
+                btn.classList.add('copied');
+                setTimeout(() => { btn.textContent = '📋'; btn.classList.remove('copied'); }, 1500);
+            });
+        }
+        document.querySelectorAll('.code-block code').forEach(code => {
+            const btn = document.createElement('button');
+            btn.className = 'copy-btn';
+            btn.textContent = '📋';
+            btn.title = 'Copy';
+            btn.addEventListener('click', () => copyCode(btn));
+            code.parentElement.appendChild(btn);
+        });
+    </script>
+</body>
+</html>
